@@ -1,0 +1,214 @@
+// ============================================================
+//  Worlds: create, list, load, save, delete.
+//  Saves go to this browser right away, and to the player's own
+//  private space in the page's store when the page can reach it
+//  (so worlds follow you between devices). Nobody else can read it.
+// ============================================================
+const SAVE = { db: null, uid: null, list: [], busy: false, pending: null, status: 'local', note: '' };
+const LS = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { } }
+};
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
+const dpath = k => 'data/users/' + SAVE.uid + '/' + k;
+function readLocalIndex() { try { const a = JSON.parse(LS.get('ew2.index') || '[]'); return Array.isArray(a) ? a.filter(m => m && typeof m.id === 'string') : []; } catch (e) { return []; } }
+function writeLocalIndex() { LS.set('ew2.index', JSON.stringify(SAVE.list)); }
+function saveBoot() {
+  SAVE.list = readLocalIndex(); sortWorlds();
+  try {
+    if (!(window.claude && window.claude.use)) return;
+    Promise.all([window.claude.use('user'), window.claude.use('db')]).then(async ([user, db]) => {
+      if (!user || !db) return; const uid = await user.id(); if (!uid) return;
+      SAVE.db = db; SAVE.uid = uid; SAVE.status = 'syncing';
+      try {
+        const snap = await withTimeout(db.doc(dpath('index')).get(), 9000);
+        const remote = snap && snap.exists && Array.isArray((snap.data() || {}).worlds) ? snap.data().worlds : [];
+        for (const m of remote) { if (!m || typeof m.id !== 'string') continue; const i = SAVE.list.findIndex(l => l.id === m.id); if (i < 0) SAVE.list.push(Object.assign({}, m, { cloud: true })); else if ((m.savedAt || 0) > (SAVE.list[i].savedAt || 0)) SAVE.list[i] = Object.assign({}, m, { cloud: true }); else SAVE.list[i].cloud = true; }
+        sortWorlds(); writeLocalIndex(); SAVE.status = 'cloud';
+      } catch (e) { SAVE.status = 'cloud'; }
+    }, () => { });
+  } catch (e) { }
+}
+function sortWorlds() { SAVE.list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)); }
+function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
+function snapshotWorld() {
+  const p = G.p;
+  return Object.assign(worldMeta(), {
+    v: 6, endless: 1, gen: 2, legacy: WORLD.legacy || {}, lairs: [...(G.lairs || [])], bless: G.bless && G.bless.t > 0 ? [G.bless.k, round(G.bless.t)] : 0, blessUsed: blessKeep(), dim: DIM, dims: Object.assign({}, DSTASH), echoes: [...(G.echoes || [])], beasts: G.beasts || {}, mods: [encodeMods(), encodeChips(), encodeIdx(PLACED), encodePairs(WMODS), encodeSeen()].join('|'), inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0),
+    food: r1(G.food), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '', mast: G.mast || {}, fight: fightSave(), boons: trinkSave(), pairs: [...(G.pairsKnown || [])], quality: G.quality || {}, reqs: G.reqs || [], stn: encodeStn(), wake: G.respawn ? 1 : 0, p: { x: r1(p.x), y: r1(p.y), hp: max(1, round(p.hp)), arm: p.arm || '' }, flags: G.flags, journal: G.journal,
+    known: [...G.known], used: [...G.movesUsed], clock: r2(G.clock), deaths: G.deaths || 0, kills: G.kills || 0,
+    leads: [...G.leads], pin: G.pin || '', found: [...G.found], links: [...G.linksKnown], respawn: G.respawn ? [G.respawn.x, G.respawn.y] : 0
+  });
+}
+function saveWorld(quiet) {
+  if (WORLD.arena || WORLD.guest || !WORLD.id || (G.state !== 'play' && G.state !== 'intro') || !G.p) return;
+  const data = snapshotWorld(), meta = worldMeta();
+  const okLocal = LS.set('ew2.w.' + WORLD.id, JSON.stringify(data));
+  const i = SAVE.list.findIndex(m => m.id === WORLD.id); if (i < 0) SAVE.list.unshift(meta); else SAVE.list[i] = Object.assign(SAVE.list[i], meta);
+  sortWorlds(); writeLocalIndex(); G.dirty = false; G.saveT = 0;
+  if (SAVE.db) { SAVE.pending = data; if (!SAVE.busy) pumpSaves(); }
+  if (!quiet) G.savedNote = { t: 0, ok: okLocal || !!SAVE.db };
+}
+async function pumpSaves() {
+  SAVE.busy = true;
+  while (SAVE.pending && SAVE.db) {
+    const data = SAVE.pending; SAVE.pending = null;
+    try {
+      const mods = data.mods || '', parts = []; for (let i = 0; i < mods.length; i += 180000) parts.push(mods.slice(i, i + 180000));
+      for (let k = 0; parts.length > 1 && k < parts.length; k++) await withTimeout(SAVE.db.doc(dpath('w-' + data.id + '-m' + k)).set({ s: parts[k] }), 15000);
+      await withTimeout(SAVE.db.doc(dpath('w-' + data.id)).set(Object.assign({}, data, { mods: parts.length > 1 ? '' : mods, mparts: parts.length > 1 ? parts.length : 0 })), 15000);
+      const m = SAVE.list.find(l => l.id === data.id); if (m) m.cloud = true;
+      await withTimeout(SAVE.db.doc(dpath('index')).set({ worlds: SAVE.list.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) }), 15000);
+      SAVE.status = 'cloud';
+    } catch (e) {
+      const c = e && e.code; SAVE.status = c === 'quota_exceeded' ? 'cloud full' : 'local';
+      if (c === 'invalid_argument' || c === 'revoked' || c === 'not_granted' || c === 'quota_exceeded') SAVE.db = null;
+    }
+  }
+  SAVE.busy = false;
+}
+async function loadWorldData(id) {
+  let local = null; try { local = JSON.parse(LS.get('ew2.w.' + id) || 'null'); } catch (e) { }
+  let remote = null;
+  if (SAVE.db) {
+    try {
+      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000);
+      if (s && s.exists) {
+        remote = Object.assign({}, s.data());
+        if (remote.mparts > 0) { let m = ''; for (let k = 0; k < remote.mparts; k++) { const ps = await withTimeout(SAVE.db.doc(dpath('w-' + id + '-m' + k)).get(), 9000); m += ps && ps.exists ? (ps.data().s || '') : ''; } remote.mods = m; }
+      }
+    } catch (e) { }
+  }
+  return remote && (!local || (remote.savedAt || 0) > (local.savedAt || 0)) ? remote : local;
+}
+function deleteWorld(id) {
+  const m = SAVE.list.find(l => l.id === id); SAVE.list = SAVE.list.filter(l => l.id !== id); writeLocalIndex(); LS.del('ew2.w.' + id);
+  if (SAVE.db && m) (async () => {
+    try {
+      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000); const n = s && s.exists ? (s.data().mparts || 0) : 0;
+      for (let k = 0; k < n; k++) await SAVE.db.doc(dpath('w-' + id + '-m' + k)).delete();
+      await SAVE.db.doc(dpath('w-' + id)).delete();
+      await SAVE.db.doc(dpath('index')).set({ worlds: SAVE.list.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) });
+    } catch (e) { }
+  })();
+}
+function seedFrom(text) {
+  const t = String(text || '').trim(); if (!t) return (Math.random() * 1e9) | 0;
+  if (/^\d{1,9}$/.test(t)) return +t; let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 1e9;
+}
+const FORGE_KIT_OLD = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku', 'pick2', 'torch', 'plank', 'brick', 'platform', 'dirt', 'stone', 'sandstone', 'snow', 'sand', 'ash', 'deepstone', 'bench', 'furnace', 'salve', 'kblade', 'kmaul', 'vpike', 'vfangs', 'shuriken', 'hook', 'flask', 'smoke'];
+function createWorld(o) {
+  Object.assign(WORLD, { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name: o.name || 'Aldermere', seed: seedFrom(o.seed), size: o.size, shape: o.shape, mode: o.mode, arena: false });
+  G.skin = o.skin; startWorld(null);
+}
+async function openWorld(meta) {
+  G.state = 'loading'; G.loadMsg = 'Opening ' + meta.name + '...';
+  const data = await loadWorldData(meta.id);
+  if (!data) { SAVE.list = SAVE.list.filter(l => l.id !== meta.id); writeLocalIndex(); G.state = 'worlds'; G.menuNote = 'That world could not be found.'; return; }
+  Object.assign(WORLD, { id: data.id, name: data.name, seed: data.seed | 0, size: clamp(data.size | 0, 0, 2), shape: clamp(data.shape | 0, 0, 2), mode: data.mode ? 1 : 0, arena: false });
+  G.skin = clamp(data.skin | 0, 0, 3); startWorld(data);
+}
+function startWorld(data) {
+  G.state = 'loading'; G.loadMsg = data ? 'Rebuilding ' + WORLD.name + '...' : 'Forging ' + WORLD.name + '...';
+  setTimeout(() => {
+    // a saved world keeps the land it was made with; a new one gets the wider lands
+    WORLD.gen = data ? (data.gen | 0) || 1 : 2;
+    netLeave(); if (COOP.role) coopLeave(); WORLD.guest = false; SEED = WORLD.seed; initEndless(); fixLeadTexts(); freshSession(); for (const k in DSTASH) delete DSTASH[k];
+    // the world's game code stays the same from one session to the next, so friends can come back with it
+    WORLD.gcode = data && typeof data.gcode === 'string' && /^[A-HJ-NP-Z2-9]{6}$/.test(data.gcode) ? data.gcode : '';
+    // new places only grow where a world made before them had not yet been
+    WORLD.legacy = !data ? {} : (data.gen | 0) >= 2 ? cleanLegacy(data.legacy) : legacyOf(data); PLC.clear();
+    // you saved standing in another world: that world is the one made now; the rest wait as their edits
+    const dimL = data && (data.v | 0) >= 6 && data.endless && DIMP[data.dim | 0] ? data.dim | 0 : 0; if (dimL) initDim(dimL);
+    if (data) {
+      // worlds saved before the new landforms regrow from their seed; their old edits would land in the wrong places
+      // worlds saved before the random lands regrow from their seed; their old edits would land in the wrong places
+      const old = (data.v | 0) < 5 && !data.mode, parts = String(data.mods || '').split('|');
+      // the land is remade as you travel: your changes wait with their chunk and go back in when it forms
+      const regrow = (data.v | 0) < 6 || !data.endless;
+      if (!regrow) {
+        if (data.dims && typeof data.dims === 'object') for (const k in data.dims) if (DIMP[k | 0] && (k | 0) !== dimL && data.dims[k]) DSTASH[k | 0] = data.dims[k];
+        deferMods(parts[0] || ''); applyIdx(parts[2] || '', i => PLACED.add(i));
+        applyPairs(parts[3] || '', (i, w) => { if (w >= 0 && w < 64 && (WTEX[w] !== undefined || w === 0)) { WMODS.set(i, w); if (w >= 8) WMODS_PLACED.add(i); const k = chunkOf(i); if (!PEND.walls.has(k)) PEND.walls.set(k, []); PEND.walls.get(k).push([i, w]); } });
+        applyChips(parts[1] || ''); decodeSeen(parts[4] || ''); if (Array.isArray(data.stn)) for (const o of data.stn) if (o && o.i >= 0 && o.i < WW * WH) { const k = chunkOf(o.i); if (!PEND.stn.has(k)) PEND.stn.set(k, []); PEND.stn.get(k).push(o); }
+      } else if (!old) G.regrewNote = true;
+      G.worn = new Set(!old && Array.isArray(data.worn) ? data.worn.filter(id => IT[id] && IT[id].pack) : []); INV_N = packCap();
+      G.gear = { head: null, body: null, legs: null, feet: null }; if (!old && Array.isArray(data.gear)) GEAR_SLOTS.forEach((s, k) => { const id = data.gear[k]; if (IT[id] && IT[id].type === 'armor' && IT[id].slot === s) G.gear[s] = { id, n: 1 }; }); GEAR_C = null; trinkLoad(!old ? data.boons : null);
+      if (!old && IT[data.off] && IT[data.off].type === 'weapon') G.gear.off = { id: data.off, n: 1 };
+      G.mast = {}; if (data.mast && typeof data.mast === 'object') for (const k in data.mast) if (STYLES[k] && isFinite(data.mast[k])) G.mast[k] = max(0, +data.mast[k]); fightLoad(data.fight, data.known); G.pairsKnown = new Set(Array.isArray(data.pairs) ? data.pairs.filter(isStyleId) : []);
+      G.food = clamp(num(data.food, 100), 0, 100); G.quality = data.quality && typeof data.quality === 'object' ? data.quality : {}; G.reqs = Array.isArray(data.reqs) ? data.reqs.filter(r => r && Array.isArray(r.need) && IT[r.need[0]] && Array.isArray(r.give) && IT[r.give[0]]) : null;
+      // a world from before the lands were dealt at random regrows, and you wake in it with nothing
+      inv = new Array(PACK_MAX).fill(null); if (!old) (Array.isArray(data.inv) ? data.inv : []).forEach((s, i) => { if (!Array.isArray(s)) return; const id = LEGACY[s[0]] || s[0]; if (i < INV_N && IT[id]) inv[i] = { id, n: clamp(s[1] | 0, 1, IT[id].stack) }; });
+      G.flags = data.flags && typeof data.flags === 'object' ? data.flags : {}; G.journal = Array.isArray(data.journal) ? data.journal.filter(j => JOURNAL[j]) : ['waking', 'forge'];
+      G.echoes = new Set((Array.isArray(data.echoes) ? data.echoes : []).filter(n => isFinite(n) && echoInfo(n))); G.beasts = data.beasts && typeof data.beasts === 'object' ? data.beasts : {};
+      G.lairs = new Set((Array.isArray(data.lairs) ? data.lairs : []).filter(s => typeof s === 'string')); G.bless = Array.isArray(data.bless) && BLESS[data.bless[0]] ? { k: data.bless[0], t: clamp(num(data.bless[1]), 0, BLESS_T) } : null;
+      G.blessUsed = {}; if (data.blessUsed && typeof data.blessUsed === 'object') for (const k in data.blessUsed) if (isFinite(data.blessUsed[k])) G.blessUsed[k] = +data.blessUsed[k];
+      G.known = new Set(Array.isArray(data.known) ? data.known : []); G.movesUsed = new Set(Array.isArray(data.used) ? data.used : []);
+      G.clock = num(data.clock, .1) % 1; G.played = num(data.played); G.deaths = data.deaths | 0; G.kills = data.kills | 0;
+      const ids = (a, ok) => new Set((Array.isArray(a) ? a : []).filter(x => typeof x === 'string' && ok(x)));
+      G.leads = ids(data.leads, x => !!LEADS[x]); G.found = ids(data.found, () => true); G.linksKnown = ids(data.links, x => !!LINKS[x]); G.pin = LEADS[data.pin] ? data.pin : null;
+      if (Array.isArray(data.respawn) && !regrow) G.respawn = { x: clamp(data.respawn[0] | 0, 1, WW - 2), y: clamp(data.respawn[1] | 0, 1, WH - 2) };
+      if (G.flags.metWick && !G.leads.size) for (const id of ['warden', 'vesper', 'keeper', 'juno', 'bram']) G.leads.add(id);
+      if (old) { G.found = new Set(); G.oldNote = true; for (const k of ['gotHook', 'gotBlade', 'gotFlask', 'bramGift', 'pellTrades']) delete G.flags[k]; G.food = 100; }
+    } else {
+      G.worn = new Set(); G.gear = { head: null, body: null, legs: null, feet: null }; GEAR_C = null; G.mast = {}; fightLoad(null, []); trinkLoad(null); G.pairsKnown = new Set(); INV_N = packCap(); inv = new Array(PACK_MAX).fill(null);
+      if (WORLD.mode === 1) { FORGE_KIT.forEach((id, i) => { if (i < INV_N && IT[id]) inv[i] = { id, n: IT[id].stack }; }); G.flags.dbl = G.flags.e2 = true; }
+    }
+    // make the land around the fire, and around wherever you were standing
+    streamTo(SPAWN_X * T, true); if (data && data.p && num(data.p.x, -1) > 0) streamTo(num(data.p.x, 0), true);
+    for (const i of PLACED) if (chunkReadyAt(i % WW)) SUP.set(i, 99); { const xs = new Set([...PLACED].filter(i => chunkReadyAt(i % WW)).map(i => i % WW)); for (const x of xs) supRecalc(x, (([...PLACED].find(i => i % WW === x)) / WW) | 0); }
+    G.p = newPlayer(); G.fighters = [G.p]; spawnNPCs();
+    if (data && data.p) { const x = num(data.p.x, -1), y = num(data.p.y, -1); if ((data.v | 0) >= 6 && data.endless && x > 0 && x < WW * T && y > 0 && y < WH * T - 40 && !boxHits(x, y, 6, 20)) { G.p.x = G.p.px = x; G.p.y = G.p.py = y; } G.p.maxhp = 100 + bonusHP(); G.p.hp = clamp(num(data.p.hp, 100), 1, G.p.maxhp); if (ARMS.includes(data.p.arm)) G.p.arm = data.p.arm; }
+    for (const s of G.p.scarf) { s.x = s.ox = G.p.x + 3; s.y = s.oy = G.p.y + 5; }
+    snapCam(); G.dirty = !data; updateSun();
+    if (!data && WORLD.mode === 0) { G.state = 'intro'; G.introI = 0; G.introT = 0; } else beginPlay(!data);
+    if (G.oldNote) { G.oldNote = false; G.banner = { text: 'THE LAND HAS CHANGED', sub: 'this world regrew. you wake with nothing; your embers and journal remain', t: 0 }; G.dirty = true; }
+    else if (G.regrewNote) { G.regrewNote = false; G.banner = { text: 'THE LAND HAS CHANGED', sub: 'the world now goes on forever. your pack, embers and journal remain', t: 0 }; G.dirty = true; }
+    if (!data) saveWorld(true);
+  }, 40);
+}
+
+const FORGE_KIT = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku', 'steel_pick', 'steel_axe', 'steel_hammer', 'plank', 'steel_shovel', 'steel_longsword', 'glass_sabre', 'ember_greataxe', 'ember_longbow', 'cutstone', 'cobble', 'beam', 'beamh', 'door',
+  'ladder', 'window', 'thatch', 'torch', 'wplank', 'wcut', 'bench', 'furnace', 'anvil2', 'bloomery', 'loom', 'cauldron', 'chest', 'campfire', 'mudbrick', 'brick', 'logwall', 'platform', 'dirt', 'sand', 'gravel', 'clay', 'charge', 'waystone', 'salve', 'shuriken', 'hook', 'flask', 'frostflask', 'smoke'];
+// compact codecs for the new layers: chipped tiles, built parts, back walls, the map, stations
+// a dug tile keeps its crater: 64 cells at two bits each (gone, badly cracked, cracked, whole)
+const B64C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+function encodeChips() {
+  const a = [...CHIP].filter(([i, c]) => (MAT[tiles[i]] || !chunkReadyAt(i % WW)) && c.some(v => v < 255)).sort((p, q) => p[0] - q[0]); let prev = 0;
+  return a.map(([i, c]) => { let s = '', acc = 0, bits = 0; for (let k = 0; k < 64; k++) { acc = ((acc << 2) | (c[k] ? (c[k] < 120 ? 1 : c[k] < 205 ? 2 : 3) : 0)) & 0xffff; bits += 2; if (bits >= 6) { bits -= 6; s += B64C[(acc >> bits) & 63]; } } if (bits) s += B64C[(acc << (6 - bits)) & 63]; const r = (i - prev).toString(36) + ':' + s; prev = i; return r; }).join(',');
+}
+function applyChips(str) {
+  if (!str) return; let i = 0;
+  for (const s of str.split(',')) {
+    const nu = s.includes(':'), [a, h] = s.split(nu ? ':' : '.'); i += parseInt(a, 36);
+    if (!(i >= 0 && i < WW * WH) || !h || (!WORLD.endless && !MAT[tiles[i]])) continue;
+    const c = new Uint8Array(64);
+    if (nu) { if (h.length !== 22) continue; let acc = 0, bits = 0, k = 0; for (const ch of h) { const v = B64C.indexOf(ch); if (v < 0) break; acc = ((acc << 6) | v) & 0xffff; bits += 6; while (bits >= 2 && k < 64) { bits -= 2; c[k++] = [0, 80, 165, 255][(acc >> bits) & 3]; } } if (k < 64) continue; }
+    else { if (h.length !== 16) continue; for (let k = 0; k < 16; k++) { const v = parseInt(h[k], 16) || 0, hp = v ? min(255, v * 16 + 15) : 0, ox = (k & 3) * 2, oy = (k >> 2) * 2; c[oy * 8 + ox] = c[oy * 8 + ox + 1] = c[(oy + 1) * 8 + ox] = c[(oy + 1) * 8 + ox + 1] = hp; } }
+    CHIP.set(i, c); dirtyAt(i % WW, (i / WW) | 0);
+  }
+}
+function encodeIdx(set) { const a = [...set].sort((p, q) => p - q); let prev = 0; return a.map(i => { const s = (i - prev).toString(36); prev = i; return s; }).join(','); }
+function applyIdx(str, fn) { if (!str) return; let i = 0; for (const s of str.split(',')) { i += parseInt(s, 36); if (i >= 0 && i < WW * WH) fn(i); } }
+function encodePairs(map) { const a = [...map].sort((p, q) => p[0] - q[0]); let prev = 0; return a.map(([i, v]) => { const s = (i - prev).toString(36) + '.' + v.toString(36); prev = i; return s; }).join(','); }
+function applyPairs(str, fn) { if (!str) return; let i = 0; for (const s of str.split(',')) { const [a, b] = s.split('.'); i += parseInt(a, 36); if (i >= 0 && i < WW * WH) fn(i, parseInt(b, 36)); } }
+function encodeStn() {
+  const out = []; for (const [i, s] of STN) {
+    if (tiles[i] !== s.t) continue; const o = { i, t: s.t };
+    if (s.items) o.items = s.items.map(q => q ? [q.id, q.n] : 0); if (s.slots) o.slots = s.slots.map(q => q && RECIPES[q.r] ? [q.r, round(q.t), RECIPES[q.r].out || ''] : 0);
+    for (const k of STN_KEYS) if (s[k] !== undefined) o[k] = typeof s[k] === 'number' ? round(s[k] * 100) / 100 : s[k];
+    out.push(o);
+  }
+  for (const arr of PEND.stn.values()) for (const o of arr) out.push(o);
+  return out;
+}
+function applyStn(arr) { if (Array.isArray(arr)) for (const o of arr) restoreStn(o); }
+function restoreStn(o) {
+  {
+    if (!o || !(o.i >= 0 && o.i < WW * WH) || tiles[o.i] !== o.t) return; const s = stnState(o.i, o.t);
+    if (Array.isArray(o.items) && s.items) o.items.forEach((q, k) => { if (k < s.items.length) s.items[k] = Array.isArray(q) && IT[q[0]] ? { id: q[0], n: clamp(q[1] | 0, 1, IT[q[0]].stack) } : null; });
+    if (Array.isArray(o.slots) && s.slots) o.slots.forEach((q, k) => { if (k < s.slots.length) s.slots[k] = Array.isArray(q) && RECIPES[q[0]] && (RECIPES[q[0]].out || '') === q[2] ? { r: q[0], t: q[1] | 0 } : null; });
+    for (const k of STN_KEYS) if (o[k] !== undefined) s[k] = o[k];
+  }
+}
