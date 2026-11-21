@@ -10,6 +10,8 @@ Made with freemessycello — a self-contained HTML game with no external runtime
 
 Ready-to-play builds are in [`Emberwake-1/`](Emberwake-1/).
 
+Play the game in your browser at <https://rogersg61.github.io/Emberwake/>.
+
 ### macOS
 
 Open [`Emberwake.app`](Emberwake-1/Emberwake.app). To keep it permanently, drag it into the Applications folder.
