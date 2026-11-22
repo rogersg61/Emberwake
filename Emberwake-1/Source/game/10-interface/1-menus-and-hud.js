@@ -349,6 +349,13 @@ function drawHUD(c) {
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
+  if (p.atk && p.atk.phase === 2) {
+    const rec = max(1, round(p.atk.m.rec * (p.atk.tm || p.atk.W.wsp || 1))), prog = clamp(p.atk.pt / rec, 0, 1);
+    const w = 120, x = round((uw - w) / 2), y = hotbarLayout().y - 30;
+    bar(c, x, y, w, 5, prog, prog >= .78 && prog <= .92 ? '#ffd35a' : prog >= .68 ? '#7ddc6f' : '#ff8a3d', '#3a2a20');
+    c.fillStyle = '#ffd35a'; c.fillRect(x + round(w * .78), y - 1, max(1, round(w * .14)), 7);
+    textC(c, prog < .68 ? 'WAIT FOR THE RETURN' : prog <= .92 ? 'STRIKE NOW' : 'RECOVERING', uw / 2, y - 9, prog >= .68 && prog <= .92 ? '#ffd35a' : '#d8d4e6', 1, textO);
+  }
   if (!A && WORLD.mode !== 1) { const f = G.food / 100; bar(c, 15, 20, 72, 2, f, f < .25 && (G.time >> 4) & 1 ? '#ff9a8a' : '#e0a050', '#7a4a1a'); if (f < .3) textO(c, f <= 0 ? 'STARVING' : 'HUNGRY', 91, 16, '#e0a050'); }
   if (p.riposte > 0 && (G.time >> 2) & 1) textO(c, 'RIPOSTE READY', 15, 22, '#8ff5e6');
   else if (!UI.open) textS(c, WORLD.royale ? '[F] open chests  [H] heal  [M] map  [TAB] who is left  [R] sidearm  [E] pack' : A ? '[TAB] scores  [C] forms  [P] menu  1-6 weapons  [R] sidearm [T] swap' : '[E] pack  [K] knap  [F] use  [J] journal  [P] menu', 4, 25, '#8b8fa3');

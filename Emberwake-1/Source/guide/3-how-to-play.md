@@ -49,7 +49,7 @@ The **workshops** turn raw things into materials: the kiln (brick, glass, charco
 
 Each kind of weapon (blades, pikes, fangs, mauls, bows, chains, fists) has its own **fighting style**, and you **learn it by using it**. A new weapon family starts at **BASICS** (the plain combo, the heavy blow, the air combo and the counter). Keep fighting with it and it grows to **FOOTWORK** (sweeps, rising strikes, dives), then **FLOW** and **MASTERY** (dashes, charged and aimed heavies). The forms page (**C**) shows what each step teaches.
 
-**Timing matters.** Every attack has a wind-up, active strike and recovery. Repeated clicks are buffered only briefly, and a new attack is strongest when you begin it inside the recovery sweet spot. Attacks started too soon deal less damage, while a rare perfect-timed follow-up may land as an exceptional critical hit. This is a light timing bonus: armour, weapons and character style still matter most.
+**Timing matters.** Every attack has a wind-up, active strike and recovery. Holding or rapidly clicking does not repeat swings. Wait until the **STRIKE NOW** meter appears during recovery, then click. A perfect-timed return deals 28% more damage, a clean timed return deals 10% more, and early inputs are ignored. This is a meaningful but measured bonus: armour, weapons and character style still decide most of a fight.
 
 **Carry weight.** Weapons, armour, blocks and pack items each have weight. The worn panel shows both armour load and the weight in your pack. Light and medium loads have no movement penalty; heavy and overloaded packs make movement, jumps, dodges and stamina slower. Dropping items relieves carry weight immediately, and larger tools or blocks weigh more than small materials.
 

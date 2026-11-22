@@ -21,7 +21,7 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
-    kills: 0, deaths: 0, foes: [], atkN: 0, lightHoldCd: 0, heavyHoldCd: 0
+    kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal'
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -94,7 +94,7 @@ function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
-  if (f.lightHoldCd > 0) f.lightHoldCd--; if (f.heavyHoldCd > 0) f.heavyHoldCd--;
+  if (f.attackInputCd > 0) f.attackInputCd--;
   if (f.chainT > 0) f.chainT--; if (f.hurtT > 0) f.hurtT--; if (f.landT > 0) f.landT--; if (f.healCd > 0) f.healCd--; if (f.placeCd > 0) f.placeCd--;
   if (f.takenT > 0 && --f.takenT <= 0) f.taken = 0;
   if (f.armCd > 0) f.armCd--; if (f.throwT > 0) f.throwT--; if (f.veil > 0) f.veil--;
@@ -110,24 +110,37 @@ function tickFighter(f, I) {
   else if (f.isPlayer && f.regenT > 420 / DIFF().regen && G.time % max(1, round((WORLD.mode === 1 || G.food > 70 ? 40 : G.food > 30 ? 80 : 1e9) / DIFF().regen / blessRegen())) === 0 && f.hp < f.maxhp) f.hp++;
   const W = heldOf(f), isW = W && W.type === 'weapon', free = f.hurtT <= 0;
   if (isW && free) {
-    if (I.lp) f.buf = { b: 'L', t: 10 };
-    else if (I.l && f.state === 'normal' && f.lightHoldCd <= 0) { f.buf = { b: 'L', t: 2 }; f.lightHoldCd = 12; }
-    if (I.rp) f.buf = { b: 'H', t: 10 };
-    else if (I.r && f.state === 'normal' && f.heavyHoldCd <= 0) { f.buf = { b: 'H', t: 2 }; f.heavyHoldCd = 16; }
+    if (I.lp || I.rp) {
+      const b = I.lp ? 'L' : 'H';
+      if (f.attackInputCd <= 0) {
+        if (f.state === 'normal') f.buf = { b, t: 10 };
+        else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
+          const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
+          const prog = clamp(f.atk.pt / rec, 0, 1);
+          if (prog >= .68) {
+            f.atkTiming = prog >= .78 && prog <= .92 ? 'perfect' : 'steady';
+            f.buf = { b, t: 10 };
+            f.attackInputCd = 8;
+            if (f === G.p) numPop(f.x + 3, f.y - 12, f.atkTiming === 'perfect' ? 'PERFECT' : 'TIMED', f.atkTiming === 'perfect' ? '#ffd35a' : '#7ddc6f');
+          } else {
+            f.atkTiming = 'rushed';
+            f.attackInputCd = 18;
+            if (f === G.p) numPop(f.x + 3, f.y - 12, 'WAIT', '#ff8a3d');
+          }
+        }
+      }
+    }
   }
   if (f.buf && --f.buf.t < 0) f.buf = null;
   if (I.dodgeP) f.dbuf = 7; else if (f.dbuf > 0) f.dbuf--;
   let a = f.atk;
   if (f.dbuf > 0 && f.dodgeCd <= 0 && f.hurtT <= 0 && f.stam >= 12 && (f.state === 'normal' || (f.state === 'attack' && (a.phase === 2 || (a.phase === 0 && a.charge > 0)))) && (f.onGround || f.coyote > 0 || f.airDash > 0)) startDodge(f, I.md, I);
   if (f.buf && f.hurtT <= 0) {
-    a = f.atk; const ok = f.state === 'normal' || (f.state === 'dodge' && f.dodgeT >= 2) || (f.state === 'attack' && a.phase === 2 && a.pt >= floor(a.m.rec * .38));
+    a = f.atk; const ok = f.state === 'normal' || (f.state === 'dodge' && f.dodgeT >= 2) || (f.state === 'attack' && a.phase === 2 && a.pt >= floor(a.m.rec * .68));
     if (ok) {
       const b = f.buf.b; f.buf = null;
-      if (f.state === 'attack') {
-        const rec = max(1, round(a.m.rec * (a.tm || a.W.wsp || 1))), prog = clamp(a.pt / rec, 0, 1);
-        f.atkTiming = prog >= .55 && prog <= .82 ? 'perfect' : prog < .55 ? 'rushed' : 'steady';
-        endAttack(f);
-      } else f.atkTiming = 'normal';
+      if (f.state === 'attack') endAttack(f);
+      else if (!f.atkTiming) f.atkTiming = 'normal';
       if (startAttack(f, b, I)) f.atkN++;
     }
   }
