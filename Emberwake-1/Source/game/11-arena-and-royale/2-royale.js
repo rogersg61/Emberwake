@@ -8,7 +8,7 @@
 //  storm clock and the echoes; every computer runs its own Waker and
 //  shares it as presence, exactly like the Cinder Ring.
 // ============================================================
-const BRW = 520, BRH = 140, BRSKY = 17, BR_MAX = 12, BR_FILL = 8;
+const BRW = 900, BRH = 160, BRSKY = 17, BR_MAX = 12, BR_FILL = 8;
 const BR_TIERS = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY'], BR_TCOL = ['#c8c4d4', '#7ddc6f', '#5aa8ff', '#c77dff', '#ffd35a'];
 const BR_MATT = { wood: 0, flint: 0, bone: 0, stone: 0, copper: 1, bronze: 1, rust: 2, chitin: 2, iron: 2, steel: 3, glass: 3, deep: 4, ember: 4 };
 const BR_OLD = { sword: 0, spear: 0, fangs: 1, maul: 2, bow: 1, nunchaku: 1, kblade: 4, kmaul: 4, vpike: 3, vfangs: 3 };
@@ -19,12 +19,12 @@ const BR_PNAMES = { moor: ['HEARTHWICK', 'MILLSTEAD', 'LANTERN GREEN'], thorn: [
 const BR_BOTN = ['WREN', 'KESTREL', 'MARROW', 'TINDER', 'SORREL', 'FLINT', 'ROOK', 'BRAMBLE', 'EMBERLY', 'SALTWICK', 'HOLLIS', 'VESK', 'ODA', 'TALLOW'];
 // storm phases: seconds of waiting, seconds of closing, share of the map still safe after, damage per second outside
 const STORM = [[55, 25, .6, 1], [35, 20, .36, 2], [28, 18, .18, 4], [24, 15, .08, 6], [20, 15, 0, 10]];
-const BR_DROP = 22 * 60;
+const BR_DROP = 32 * 60;
 const BR = {
   on: false, via: 'solo', code: 'open', phase: '', mi: '', seed: 0, t: 0, ro: [], nb: 0, lead: true, leaderId: '', people: new Map(),
   cd: 0, cdAt: 0, cdMax: 0, chests: [], open: new Set(), mine: new Set(), zones: [], storm: null, bots: new Map(), bk: [], bkSeq: 0, bkSeen: new Map(),
   dlSeen: new Set(), dl: null, place: 0, spec: null, specT: 0, overT: 0, winner: '', winMe: false, pois: [], segs: BR_BIOMES.slice(), segW: BRW / 5, mapCv: null,
-  note: '', noteT: 0, chan: null, inStorm: false, poiNow: '', mapOpen: false, total: 0, lastAlive: 0, lobbyT: 0, err: ''
+  note: '', noteT: 0, chan: null, inStorm: false, poiNow: '', mapOpen: false, total: 0, lastAlive: 0, lobbyT: 0, err: '', specials: []
 };
 const brOn = () => WORLD.royale && BR.on;
 const brTag = f => !f ? '' : f === G.p ? (NET.me || 'me') : f.botTag || f.peer || '';
@@ -42,13 +42,14 @@ function brItems() {
 }
 function brRollTier(rare) { const r = Math.random(); return rare ? (r < .3 ? 2 : r < .78 ? 3 : 4) : (r < .4 ? 0 : r < .7 ? 1 : r < .89 ? 2 : r < .975 ? 3 : 4); }
 function brLoot(rare) {
-  const P = brPool(), k = brRollTier(rare), pool = P[k].length ? P[k] : P[0], out = [[fpick(pool), 1]];
-  const n = rare ? 2 : 1 + (Math.random() < .55 ? 1 : 0);
+  const P = brPool(), k = brRollTier(rare), pool = P[k].length ? P[k] : P[0], out = [];
+  if (rare ? Math.random() < .72 : Math.random() < .14) out.push([fpick(pool), 1]);
+  const n = rare ? 2 : 1;
   for (let i = 0; i < n; i++) {
     const r = Math.random();
     out.push(r < .27 ? ['br_salve', 2] : r < .38 ? ['br_draught', 1] : r < .62 ? ['br_shard', 2] : r < .7 ? ['br_ward', 1] : r < .84 ? [fpick(['shuriken', 'flask', 'smoke']), fpick([2, 3])] : r < .9 ? ['hook', 1] : ['arrow', 15]);
   }
-  if (IT[out[0][0]].ammo && !out.some(o => o[0] === 'arrow')) out.push(['arrow', 20]);
+  if (out[0] && IT[out[0][0]].ammo && !out.some(o => o[0] === 'arrow')) out.push(['arrow', 20]);
   return out;
 }
 
@@ -86,7 +87,7 @@ function genRoyale(seed) {
   SPAWN_X = BRW >> 1; SHRINE_X = SHRINE2_X = MINE_X = FORGE_X = GATE_X = SKY_X = BLADE_X = SPIRE_X = REACH_X = RUST_X = -100000; SHRINE_Y = SHRINE2_Y = GATE_Y = MINE_Y = FORGE_Y = SKY_Y = 0;
   BASE_Y = 74; DEEP_Y = 9999; DRIFT_Y = -99; VIL_Y = -999;
   const order = BR_BIOMES.slice(); for (let i = order.length - 1; i > 0; i--) { const j = randi(0, i); const q = order[i]; order[i] = order[j]; order[j] = q; }
-  BR.segs = order; BR.segW = BRW / order.length; BR.chests = []; BR.pois = [];
+  BR.segs = order; BR.segW = BRW / order.length; BR.chests = []; BR.pois = []; BR.specials = [];
   // the shape of the land: rolling hills, steeper in the Reach, flatter in the dunes, cliffs at the edges of the world
   const a1 = rand(TAU), a2 = rand(TAU), a3 = rand(TAU);
   for (let x = 0; x < BRW; x++) {
@@ -102,7 +103,7 @@ function genRoyale(seed) {
     SKYL[x] = gy + 3;
   }
   // tunnels under the hills: two or three, each with a chest or two at its far end
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 4; k++) {
     let x = randi(40, BRW - 80), y = heights[x] + 1, dir = rand() < .5 ? -1 : 1, len = randi(50, 90), ent = x;
     for (let s = 0; s < len; s++) {
       const dy = s < 10 ? 1 : s > len - 10 ? -1 : (rand() < .2 ? (rand() < .5 ? -1 : 1) : 0); x += dir; y = clamp(y + dy, heights[clamp(x, 0, BRW - 1)] + 2, BRH - 12);
@@ -119,8 +120,14 @@ function genRoyale(seed) {
     const cx = round((i + .5) * BR.segW + rand(-BR.segW * .18, BR.segW * .18)), names = BR_PNAMES[b], name = names.find(n => !used.has(n) && rand() < .6) || names[0]; used.add(name);
     withRng(hh(cx, 2201, SEED) * 4294967296, () => brPOI(b, cx, name));
   });
-  // floating isles with a rare chest each, and a vent beneath to reach them
+  // rare map landmarks give a useful, random one-time boost instead of another chest
   for (let k = 0; k < 3; k++) {
+    const cx = randi(30, BRW - 31), gy = heights[cx], type = k === 0 ? 'cache' : k === 1 ? 'shrine' : 'grove';
+    BR.specials.push({ x: cx, y: gy - 1, type, open: false });
+    reserve(cx - 3, cx + 3, 1);
+  }
+  // floating isles with a rare chest each, and a vent beneath to reach them
+  for (let k = 0; k < 2; k++) {
     const cx = round((k + .5) * BRW / 3 + rand(-50, 50)), cy = heights[cx] - 26 - randi(0, 6), a = 7 + randi(0, 3);
     if (island(cx, cy, a, 4, false)) { for (let y = cy - 4; y < cy; y++) for (let x = cx - 3; x <= cx + 3; x++) if (inW(x, y)) tiles[y * WW + x] = AIR; let gy = cy; while (gy < cy + 6 && !solidAt(cx, gy)) gy++; brChest(cx, gy - 1, true, { high: true }); const vx = cx + (rand() < .5 ? -1 : 1) * (a + 3); vent(vx, cy - 8); }
   }
@@ -131,10 +138,15 @@ function genRoyale(seed) {
     if (rand() < ch && abs(heights[x - 1] - gy) <= 1 && abs(heights[x + 1] - gy) <= 1) { brTree(x, gy, b); x += 3; continue; }
     const r = rand(); if (b === 'dunes') { if (r < .05) tiles[(gy - 1) * WW + x] = DEADBUSH; } else if (b === 'ash') { if (r < .04) tiles[(gy - 1) * WW + x] = DEADBUSH; } else if (b !== 'reach' || r < .3) { if (r < .22) tiles[(gy - 1) * WW + x] = TALLGRASS; else if (r < .27) tiles[(gy - 1) * WW + x] = FLOWER; else if (r < .29) tiles[(gy - 1) * WW + x] = BUSH; }
   }
+  // diggable surface deposits: gather rock and flint instead of finding a complete weapon
+  for (let k = 0; k < 18; k++) {
+    const cx = randi(24, BRW - 25), gy = heights[cx];
+    for (let dx = -1; dx <= 1; dx++) { const x = cx + dx; if (tileAt(x, gy - 1) === AIR) tiles[(gy - 1) * WW + x] = rand() < .35 ? GRAVEL : STONE; }
+  }
   // chests out in the open, about one every thirty paces
-  for (let x = 20; x < BRW - 20; x += 22 + randi(0, 16)) { if (RESV[x]) continue; const gy = heights[x]; if (abs(heights[x - 1] - gy) <= 1 && abs(heights[x + 1] - gy) <= 1) brChest(x, gy - 1, rand() < .1); }
+  for (let x = 20; x < BRW - 20; x += 48 + randi(0, 28)) { if (RESV[x]) continue; const gy = heights[x]; if (abs(heights[x - 1] - gy) <= 1 && abs(heights[x + 1] - gy) <= 1) brChest(x, gy - 1, rand() < .08); }
   // a few watch platforms with a chest on top
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 4; k++) {
     const x = randi(30, BRW - 40); if (RESV[x] || RESV[x + 7]) continue; const gy = min(heights[x], heights[x + 7]), py = gy - 6;
     for (let y = py + 1; y <= max(heights[x], heights[x + 7]) - 1; y++) { if (tileAt(x, y) === AIR) tiles[y * WW + x] = BEAM; if (tileAt(x + 7, y) === AIR) tiles[y * WW + x + 7] = BEAM; }
     for (let xx = x; xx <= x + 7; xx++) if (tileAt(xx, py) === AIR) tiles[py * WW + xx] = PLATFORM;
@@ -151,30 +163,30 @@ function brPOI(b, cx, name) {
     brFlat(cx - 26, cx + 26, gy); brEase(cx - 26, -1, gy); brEase(cx + 26, 1, gy);
     house(cx - 22, gy, 11, 6, 4, { door: 2, name }); house(cx - 5, gy, 11, 9, 4, { door: 2, floors: 2 }); house(cx + 12, gy, 10, 6, 3, { door: 2 });
     for (let x = cx - 24; x <= cx + 24; x++) for (let y = gy - 4; y < gy; y++) if (tiles[y * WW + x] === DOORC) tiles[y * WW + x] = DOORO;
-    brChest(cx - 17, gy - 1, false); brChest(cx, gy - 1, false); brChest(cx + 1, gy - 5, true); brChest(cx + 16, gy - 1, false);
+    brChest(cx - 17, gy - 1, false); brChest(cx + 16, gy - 1, false);
     dyn(cx - 24, gy - 1, TORCH); dyn(cx + 24, gy - 1, TORCH);
   } else if (b === 'thorn') {
     brFlat(cx - 18, cx + 18, gy); brEase(cx - 18, -1, gy); brEase(cx + 18, 1, gy);
     for (const [ox, w] of [[-14, 7], [5, 8]]) { const x0 = cx + ox; for (let k = 0; k < w; k++) { const hgt = round((1 - abs(k - (w - 1) / 2) / (w / 2)) * 4); for (let y = gy - hgt; y < gy; y++) if (y === gy - hgt || k === 0 || k === w - 1) tiles[y * WW + x0 + k] = THATCH; else walls[y * WW + x0 + k] = W_WATTLE; } }
     dyn(cx - 2, gy - 1, CAMP);
-    brChest(cx - 11, gy - 1, false); brChest(cx + 9, gy - 1, true); brChest(cx + 15, gy - 1, false);
+    brChest(cx - 11, gy - 1, false); brChest(cx + 9, gy - 1, true);
     for (const ox of [-17, 17]) brTree(cx + ox, gy, 'thorn');
   } else if (b === 'dunes') {
     brFlat(cx - 14, cx + 14, gy); brEase(cx - 14, -1, gy); brEase(cx + 14, 1, gy);
-    tower(cx - 4, gy, 9, 20, { ruin: true, name }); brChest(cx, gy - 1, false); brChest(cx - 1, gy - 5, false); brChest(cx + 1, gy - 13, false); brChest(cx, gy - 21, true, { high: true });
+    tower(cx - 4, gy, 9, 20, { ruin: true, name }); brChest(cx - 1, gy - 5, false); brChest(cx, gy - 21, true, { high: true });
     for (const ox of [-12, 10]) for (let y = gy - 3; y < gy; y++) tiles[y * WW + cx + ox] = SANDSTONE;
   } else if (b === 'reach') {
     brFlat(cx - 20, cx + 20, gy); brEase(cx - 20, -1, gy); brEase(cx + 20, 1, gy);
     for (let x = cx - 16; x <= cx + 16; x++) { for (let y = gy - 9; y < gy; y++) walls[y * WW + x] = W_BRICK; tiles[(gy - 9) * WW + x] = abs(x - cx) < 15 ? PLATFORM : BRICK; if (abs(x - cx) % 3 === 0) tiles[(gy - 10) * WW + x] = BRICK; }
     for (const s of [-1, 1]) { for (let y = gy - 9; y < gy - 3; y++) tiles[y * WW + cx + s * 16] = BRICK; for (let y = gy - 13; y < gy - 9; y++) { tiles[y * WW + cx + s * 16] = BRICK; tiles[y * WW + cx + s * 15] = BRICK; } }
     for (let x = cx - 6; x <= cx + 6; x++) tiles[(gy - 5) * WW + x] = PLATFORM;
-    brChest(cx - 10, gy - 1, false); brChest(cx + 10, gy - 1, false); brChest(cx, gy - 6, true); brChest(cx + 12, gy - 10, false, { high: true });
+    brChest(cx - 10, gy - 1, false); brChest(cx, gy - 6, true);
     dyn(cx - 13, gy - 4, TORCH); dyn(cx + 13, gy - 4, TORCH);
   } else {
     brFlat(cx - 18, cx + 18, gy); brEase(cx - 18, -1, gy); brEase(cx + 18, 1, gy);
     for (const [ox, h] of [[-15, 6], [-9, 9], [7, 7], [14, 5]]) for (let y = gy - h; y < gy; y++) { tiles[y * WW + cx + ox] = y < gy - h + 2 && rand() < .5 ? AIR : CINDERBRICK; walls[y * WW + cx + ox + 1] = W_RUIN; }
     for (let x = cx - 9; x <= cx + 7; x++) tiles[(gy - 9) * WW + x] = PLATFORM;
-    vent(cx - 3, gy - 22); brChest(cx - 12, gy - 1, false); brChest(cx + 2, gy - 1, false); brChest(cx - 1, gy - 10, true, { high: true }); brChest(cx + 11, gy - 1, false);
+    vent(cx - 3, gy - 22); brChest(cx - 12, gy - 1, false); brChest(cx - 1, gy - 10, true, { high: true });
   }
   reserve(cx - 28, cx + 28, 2);
 }
@@ -254,6 +266,21 @@ function brOpenChest(c, f) {
   if (f === G.p) { loot.forEach(([id, n], k) => spawnDrop(id, n, px - 3, py - 4, (k - (loot.length - 1) / 2) * 1.1, -2.4 - k * .2)); return; }
   if (f && f.br) for (const [id, n] of loot) brBotTake(f, id, n);
 }
+function brNearSpecial(f, r = 18) {
+  let best = null, bd = r;
+  for (const s of BR.specials) if (!s.open) { const d = abs(s.x * T + 4 - (f.x + 3)) + abs(s.y * T - (f.y + f.h)) * .7; if (d < bd) { bd = d; best = s; } }
+  return best;
+}
+function brOpenSpecial(s, f) {
+  if (!s || s.open) return;
+  s.open = true;
+  const px = s.x * T + 4, py = s.y * T;
+  if (s.type === 'cache') { f.ward = min(100, (f.ward || 0) + 35); spawnDrop('br_shard', 2, px, py - 4, 0, -2); BR.note = 'EMBER CACHE  :  +35 ward'; }
+  else if (s.type === 'shrine') { f.brBoost = 240; f.hp = min(f.maxhp, f.hp + 30); BR.note = 'ASHEN SHRINE  :  30 health and a 4-second speed rite'; }
+  else { f.ward = min(100, (f.ward || 0) + 20); if (f === G.p) spawnDrop('br_salve', 2, px, py - 4, 0, -2); BR.note = 'ASH GROVE  :  ward and field medicine'; }
+  BR.noteT = 180;
+  sfx('shrine', 0); burst(px, py, 20, ['#ffd35a', '#ff8a3d', '#fff1a8'], 1.8, 40, { glow: 1 });
+}
 function brBotTake(f, id, n) {
   const it = IT[id]; if (!it) return;
   if (it.type === 'weapon') { if (brTier(id) > brTier(f.wid) || f.wid === 'fists') { f.wid = id; f.arms = f.arms || []; } }
@@ -283,6 +310,8 @@ function brEnterMatch(mi, seed, roster, nb) {
   Object.assign(BR, { mapHide: false, mi, seed, t: 0, ro: roster.slice(), nb, phase: 'drop', open: new Set(), mine: new Set(), bots: new Map(), bk: [], bkSeq: 0, bkSeen: new Map(), dlSeen: new Set(), dl: null, place: 0, spec: null, specT: 0, overT: 0, winner: '', winMe: false, chan: null, note: '', noteT: 0, inStorm: false, poiNow: '', mapOpen: false, lastAlive: 0 });
   BR.zones = brZones(seed); BR.storm = brStormAt(0); NET.deathN = 0; NET.kb = ['', 0]; NET.hits = []; NET.shots = []; NET.seen.clear();
   inv = new Array(INV_N).fill(null); G.sel = 0;
+  const brKit = [['stick', 12], ['fiber', 8], ['flint', 6], ['rock', 10], ['arrow', 12], ['twine', 5]];
+  brKit.forEach(([id, n], i) => inv[i] = { id, n });
   G.p = newPlayer(); Object.assign(G.p, { name: G.nick, brIn: true, ward: 0, onBarge: true, noHit: true, team: 'me' }); G.fighters = [G.p]; G.npcs = []; G.enemies = [];
   for (const f of NET.peers.values()) { f.gone = true; } NET.peers.clear();
   // echoes fill the empty places; the leader runs them, everyone else sees them through the leader
@@ -307,6 +336,7 @@ function brTick() {
   // my Waker and my echoes take storm damage; everyone else's computer handles theirs
   if (BR.t % 30 === 0 && BR.phase !== 'over') for (const f of G.fighters) if (f.brIn && !f.remote && !f.dead && !f.onBarge && brOut(f)) brStormHurt(f);
   const p = G.p; BR.inStorm = !p.dead && !p.onBarge && brOut(p);
+  if (p.brBoost > 0) p.brBoost--;
   // the named place you stand in
   if (!p.dead && !p.onBarge && G.time % 20 === 0) { const q = BR.pois.find(q => abs(q.x * T - p.x) < 26 * T); const n = q ? q.name : ''; if (n && n !== BR.poiNow) { G.note = { text: n, t: 0 }; } BR.poiNow = n; }
   // spectating after you fall
@@ -351,7 +381,7 @@ function brInput(p, I) {
   const it = heldItem();
   if (it && it.type === 'brheal' && !UI.open) { if (I.lp && !p.brUse) brStartUse(p, it.id); I.lp = I.l = false; }
   if (!UI.open && !G.dialog) {
-    if (pressed.KeyF) { const c = brNearChest(p); if (c) brOpenChest(c, p); }
+    if (pressed.KeyF) { const c = brNearChest(p); if (c) brOpenChest(c, p); else { const s = brNearSpecial(p); if (s) brOpenSpecial(s, p); } }
     if (pressed.KeyH) brQuickUse(p);
     if (pressed.KeyT) cycleArm(p);
   }

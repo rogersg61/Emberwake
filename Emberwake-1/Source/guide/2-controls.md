@@ -5,7 +5,7 @@
 | **A / D** | move |
 | **Space** or **W** | jump (hold **S** to drop through bridges) |
 | **Shift** | dodge (dodge through a hit at the last moment, then strike back: a riposte) |
-| **Left mouse** | light attack; hold it to keep attacking. Clicking a creature always punches it, whatever you hold |
+| **Left mouse** | light attack. Click again once the recovery window opens; holding it does not spam attacks. Clicking a creature always punches it, whatever you hold |
 | **Right mouse** or **Q** | heavy attack (hold to charge); also opens doors |
 | **V** | change weapon style (five per weapon, unlocked by training) |
 | **X** | swap to your off-hand weapon (pairs make combo finishers) |

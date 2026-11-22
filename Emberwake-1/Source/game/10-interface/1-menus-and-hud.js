@@ -103,6 +103,7 @@ function drawTip(c, lines) {
 }
 function itemTip(it) {
   const L = [[it.name, '#ffd35a']];
+  if (it.wt !== undefined) L.push([`weight ${it.wt} per item`, '#b9bdd0']);
   if (it.type === 'weapon') {
     const q = qBonus(it.id), tr = ['bleed', 'poison', 'frost', 'burn', 'steal', 'stag'].filter(k => it[k]).map(k => ({ bleed: 'bleeds', poison: 'poisons', frost: 'chills', burn: 'burns', steal: 'drinks life', stag: 'staggers' }[k]));
     L.push([`${it.dmg} damage${q ? ` (${q > 0 ? '+' : ''}${round(q * 100)}% ${QN[qTier(G.quality[it.id])].toLowerCase()})` : ''}${it.wsp ? (it.wsp < .95 ? ', quick' : it.wsp > 1.08 ? ', slow' : '') : ''}`, '#fff']);

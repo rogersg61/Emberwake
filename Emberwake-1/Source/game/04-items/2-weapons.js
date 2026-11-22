@@ -70,7 +70,8 @@ function buildWeapons() {
     if (T0.rows) { const pal = { h: M.h, p: M.g, g: M.g, w: M.w, b: M.b, B: M.B, x: M.x }; held = spr(T0.rows, pal); grip = T0.grip; }
     else if (T0.bow) { held = bowSpr(T0.bow, M, T0.curl); grip = [7, T0.bow >> 1]; }
     else nun = { st: mt === 'bone' ? '#e6dccc' : M.h, cap: M.x, l1: M.w, l2: M.B, end: T0.nun, n: T0.nun === 'blade' ? 5 : T0.nun === 'ball' ? 4 : 3, head: M.b };
-    const o = { name: `${M.n} ${T0.n}`, type: 'weapon', set: T0.set, dmg, len: T0.len, wsp: T0.sp, stack: 1, held, grip, dual: !!T0.dual, desc: [T0.d, M.t].filter(Boolean).join(' '), tier: mt, wtype: ty };
+    const wt = round((.65 + T0.sz * .55 + (T0.set === 'maul' ? .7 : T0.set === 'spear' ? .35 : 0)) * 10) / 10;
+    const o = { name: `${M.n} ${T0.n}`, type: 'weapon', set: T0.set, dmg, len: T0.len, wt, wsp: T0.sp, stack: 1, held, grip, dual: !!T0.dual, desc: [T0.d, M.t].filter(Boolean).join(' '), tier: mt, wtype: ty };
     for (const k of ['bleed', 'poison', 'frost', 'burn', 'steal', 'glow', 'cold', 'stag']) if (M[k] || T0[k]) o[k] = max(M[k] || 0, T0[k] || 0) || M[k] || T0[k];
     o.crit = (M.crit || 0) + (T0.crit || 0);
     if (T0.set === 'bow') o.ammo = true;

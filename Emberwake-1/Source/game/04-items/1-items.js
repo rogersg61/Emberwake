@@ -4,7 +4,16 @@
 //  from beasts, and from what you make of them at the right station.
 // ============================================================
 const IT = {};
-function defI(id, o) { IT[id] = Object.assign({ id, name: id, stack: 999, type: 'mat', desc: '' }, o); }
+function defI(id, o) {
+  const base = Object.assign({ id, name: id, stack: 999, type: 'mat', desc: '' }, o);
+  if (base.wt === undefined) {
+    base.wt = base.type === 'weapon' ? 2.5 : base.type === 'armor' ? 1.5 : base.type === 'tool' ? 1.2 :
+      base.type === 'block' || base.type === 'wall' ? .9 : base.type === 'trinket' ? .35 :
+      base.type === 'food' || base.type === 'heal' ? .2 : base.type === 'util' ? .45 :
+      base.type === 'offering' ? 1 : base.type === 'summon' ? .25 : .1;
+  }
+  IT[id] = base;
+}
 // small icon templates: a/b/c/d run light to dark, e and f are accents, w is white
 const ICT = {
   nug: ['..ab...', '.abbc..', 'abebcc.', 'bbbccd.', '.bccdd.', '..dd...'],
@@ -88,13 +97,16 @@ const icon = (t, p) => outlined(spr(ICT[t], typeof p === 'string' ? PAL[p] : p))
 function buildItems() {
   const M = (id, name, ic, pal, desc, o) => defI(id, Object.assign({ name, icon: icon(ic, pal), desc }, o));
   // the old weapons of the story (found, given or taken)
-  const wp = (id, name, set, dmg, len, icon, held, grip, desc, o) => defI(id, Object.assign({ name, type: 'weapon', set, dmg, len, stack: 1, icon, held, grip, desc }, o));
+  const wp = (id, name, set, dmg, len, icon, held, grip, desc, o) => {
+    const wt = set === 'maul' ? 3.8 : set === 'bow' ? 2 : set === 'spear' ? 2.8 : set === 'chuks' ? 2 : set === 'fangs' ? 1.8 : set === 'brawl' ? 0 : 2.4;
+    defI(id, Object.assign({ name, type: 'weapon', set, dmg, len, wt, stack: 1, icon, held, grip, desc, ammo: set === 'bow' && id !== 'bow' }, o));
+  };
   wp('sword', "Waker's Blade", 'sword', 11, 15, SPR.i_sword, SPR.w_sword, [2, 2], 'Rusted, but it remembers every form.');
   wp('kblade', 'Kindled Blade', 'sword', 17, 15, SPR.i_kblade, SPR.w_kblade, [2, 2], 'Reforged in emberlight. It burns to be used.', { glow: true });
   wp('spear', 'Ashwood Pike', 'spear', 10, 22, SPR.i_spear, SPR.w_spear, [8, 2], 'Long reach. Thrusts, vaults and sweeps.');
   wp('fangs', 'Twinfangs', 'fangs', 7, 9, SPR.i_fangs, SPR.w_fangs, [2, 2], 'A blade in each hand. Fast, close, relentless.', { dual: true });
   wp('maul', "Warden's Knuckle", 'maul', 19, 17, SPR.i_maul, SPR.w_maul, [3, 4], 'Slow and enormous. Heavy forms shrug off blows.');
-  wp('bow', 'Dawnstring', 'bow', 9, 9, SPR.i_bow, SPR.w_bow, [7, 10], 'Looses arrows of light. It never runs dry.');
+  wp('bow', 'Dawnstring', 'bow', 9, 9, SPR.i_bow, SPR.w_bow, [7, 10], 'Looses enchanted light arrows. It never runs dry.');
   wp('vpike', "Vesper's Glasspike", 'spear', 14, 22, outlined(SPR.w_vpike), SPR.w_vpike, [8, 2], 'Cold to hold.', { cold: true });
   wp('vfangs', 'Mirror Fangs', 'fangs', 10, 9, outlined(SPR.w_vfangs), SPR.w_vfangs, [2, 2], 'Cold to hold.', { dual: true, cold: true });
   wp('nunchaku', 'Rattlechain', 'chuks', 8, 12, SPR.i_nunchaku, null, [0, 0], 'Two sticks and a chain. Quick, snapping, and cruel to a pinned foe.', { chuks: true });
@@ -207,8 +219,9 @@ function buildItems() {
   U('whetstone', 'Whetstone', 'whet', 'whet', 'whet', 'Click to hone your held weapon: +20% damage for 40 blows.', { stack: 10 });
   U('waystone', 'Waystone', 'stone', 'way', 'place', 'Place it. Touch any waystone to travel to another you have raised.', { type: 'block', tile: WAYSTONE, stack: 5 });
   // ---- building ----
-  const blk = (id, name, tile, desc = 'Placeable block.', o) => defI(id, Object.assign({ name, type: 'block', tile, icon: outlined(TEX[tile][0]), desc }, o));
-  const wal = (id, name, w, desc) => defI(id, { name, type: 'wall', wall: w, icon: outlined(WTEX[w][0]), desc: desc || 'A back wall. Blocks the sky, keeps a room a room.' });
+  const BLOCK_WT = { plank: .7, brick: 1.2, platform: .55, packed: .8, cobble: 1.1, cutstone: 1.5, mudbrick: .9, logwall: 1.3, wattle: .7, thatch: .35, cinderbrick: 1.6, window: .6, beam: 1.1, beamh: 1.1, door: 1.2, ladder: .5, bedroll: .8, charge: 1.8, waystone: 3 };
+  const blk = (id, name, tile, desc = 'Placeable block.', o) => defI(id, Object.assign({ name, type: 'block', tile, wt: BLOCK_WT[id] || .9, icon: outlined(TEX[tile][0]), desc }, o));
+  const wal = (id, name, w, desc) => defI(id, { name, type: 'wall', wall: w, wt: { wplank: .7, wlog: 1.3, wwattle: .7, wmud: .9, wcobble: 1.1, wcut: 1.5, wbrick: 1.2 }[id] || 1, icon: outlined(WTEX[w][0]), desc: desc || 'A back wall. Blocks the sky, keeps a room a room.' });
   blk('plank', 'Stalkwood Planks', PLANK); blk('brick', 'Forge Brick', BRICK, 'Kiln-fired brick. Bloomeries are built of it.');
   blk('platform', 'Rope Bridge', PLATFORM, 'Jump up through it. Hold S to drop.');
   blk('packed', 'Packed Earth', PACKED, 'Rammed loam. Cheap, holds a little.'); blk('cobble', 'Cobble', COBBLE, 'Rock set in mortar. Strong upward, weak across.');
@@ -219,10 +232,10 @@ function buildItems() {
   blk('beamh', 'Beam', BEAMH, 'A horizontal timber. Spans wide gaps. Stand on it.'); blk('door', 'Door', DOORC, 'Needs three tall clear tiles. [F] or right-click opens it.');
   blk('ladder', 'Ladder', LADDER, 'Climb with W and S.');
   wal('wplank', 'Plank Wall', W_PLANK); wal('wlog', 'Log Back Wall', W_LOG); wal('wwattle', 'Wattle Wall', W_WATTLE); wal('wmud', 'Mudbrick Wall', W_MUDB); wal('wcobble', 'Cobble Wall', W_COBBLE); wal('wcut', 'Cut Stone Wall', W_CUT); wal('wbrick', 'Brick Wall', W_BRICK);
-  defI('torch', { name: 'Pod Lantern', type: 'block', tile: TORCH, icon: SPR.i_torch, desc: 'Warm light. Hang it on walls or blocks.' });
-  const st = (id, name, tile, desc) => defI(id, { name, type: 'block', tile, stack: 20, icon: STN_SPR[tile] ? outlined(STN_SPR[tile].img) : null, desc });
-  defI('bench', { name: 'Workbench', type: 'block', tile: BENCH, icon: SPR.i_bench, stack: 20, desc: 'Woodwork. Saw with the mouse: long strokes, not frantic ones.' });
-  defI('furnace', { name: 'Kiln', type: 'block', tile: FURNACE, icon: SPR.i_furnace, stack: 20, desc: 'Fires pottery and brick, bakes charcoal, melts glass. Feed it and work the damper.' });
+  defI('torch', { name: 'Pod Lantern', type: 'block', tile: TORCH, wt: .25, icon: SPR.i_torch, desc: 'Warm light. Hang it on walls or blocks.' });
+  const st = (id, name, tile, desc) => defI(id, { name, type: 'block', tile, wt: 2.5, stack: 20, icon: STN_SPR[tile] ? outlined(STN_SPR[tile].img) : null, desc });
+  defI('bench', { name: 'Workbench', type: 'block', tile: BENCH, icon: SPR.i_bench, wt: 2.2, stack: 20, desc: 'Woodwork. Saw with the mouse: long strokes, not frantic ones.' });
+  defI('furnace', { name: 'Kiln', type: 'block', tile: FURNACE, icon: SPR.i_furnace, wt: 3.2, stack: 20, desc: 'Fires pottery and brick, bakes charcoal, melts glass. Feed it and work the damper.' });
   st('campfire', 'Campfire', FIRE, 'Cook on it. Lit with flint. Feed it sticks, logs, peat or coal.'); st('chest', 'Chest', CHEST, 'Holds 20 stacks.');
   st('wheel', 'Potter\'s Wheel', WHEEL, 'Throw clay into jugs, crucibles and cauldrons.'); st('quern', 'Quern', QUERN, 'Grind by circling the mouse around the stone.');
   st('bloomery', 'Bloomery', BLOOMERY, 'Smelts ore with charcoal or coal. Pump the bellows to hold the heat.'); st('anvil', 'Stone Anvil', ANVIL, 'Smith sunmetal and bronze. Strike on the marks.');
@@ -236,7 +249,7 @@ function buildItems() {
   defI('flask', { name: 'Ember Flask', type: 'arm', icon: SPR.i_flask, stack: 30, desc: '[R] throw. Bursts into fire that clings.' });
   defI('smoke', { name: 'Smoke Pellet', type: 'arm', icon: SPR.i_smoke, stack: 30, desc: '[R] throw. Blinds whoever is caught in the cloud.' });
   M('frostflask', 'Frost Flask', 'jug', { a: '#ffffff', b: '#c9fff6', c: '#62a9bc', d: '#2a5a6a', e: '#ffffff' }, '[R] throw. Bursts into cold that slows everything it touches.', { type: 'arm', stack: 30 });
-  M('arrow', 'Arrow', 'arrow', { a: '#e8edf2', b: '#8a6a48', e: '#f4efe6' }, 'Crafted bows need them. Dawnstring does not.', { stack: 300 });
+  M('arrow', 'Arrow', 'arrow', { a: '#e8edf2', b: '#8a6a48', e: '#f4efe6' }, 'Fletched projectiles for every bow, including Dawnstring.', { stack: 300, wt: .025 });
   defI('wember', { name: "Warden's Ember", type: 'relic', stack: 1, icon: SPR.i_wember, desc: 'The first ember. Jump again in mid-air.' });
   defI('wember2', { name: 'Still Ember', type: 'relic', stack: 1, icon: SPR.i_wember2, desc: 'The second ember. Dodge twice in mid-air.' });
   defI('wember3', { name: 'Deep Ember', type: 'relic', stack: 1, icon: SPR.i_wember3, desc: 'The third ember. Molten cinder will not burn you.' });
@@ -400,6 +413,23 @@ function buildUses() {
 const PACK0 = 20, PACK_MAX = 50;
 let INV_N = PACK0;
 let inv = [];
+const CARRY_AT = [25, 55, 85];
+const CARRY_CLASS = [
+  { n: 'LIGHT', col: '#7ddc6f', walk: 1, jump: 1, dodge: 1, light: 1, heavy: 1, air: 1, dash: 1, bow: 1, mine: 1, swing: 1, st: 1, d: 'carrying comfortably' },
+  { n: 'MEDIUM', col: '#ffd35a', walk: .97, jump: .99, dodge: .96, light: .98, heavy: 1.02, air: .96, dash: .97, bow: .98, mine: .97, swing: 1.02, st: .96, d: 'a little encumbered' },
+  { n: 'HEAVY', col: '#ff8a3d', walk: .88, jump: .94, dodge: .86, light: .92, heavy: 1.05, air: .88, dash: .88, bow: .9, mine: .92, swing: 1.08, st: .86, d: 'heavy pack: slower movement and stamina' },
+  { n: 'OVERLOADED', col: '#e2483b', walk: .76, jump: .86, dodge: .68, light: .86, heavy: 1.08, air: .78, dash: .76, bow: .82, mine: .84, swing: 1.12, st: .72, d: 'overloaded: drop some items to move freely' }
+];
+function carryStats() {
+  let wt = 0;
+  for (let i = 0; i < INV_N; i++) {
+    if (i === G.sel) continue;
+    const s = inv[i];
+    if (s && IT[s.id]) wt += (IT[s.id].wt || 0) * s.n;
+  }
+  const ci = wt <= CARRY_AT[0] ? 0 : wt <= CARRY_AT[1] ? 1 : wt <= CARRY_AT[2] ? 2 : 3;
+  return { wt: round(wt * 10) / 10, ci, cls: CARRY_CLASS[ci] };
+}
 const packCap = () => WORLD.arena ? 10 : WORLD.mode === 1 ? PACK_MAX : min(PACK_MAX, PACK0 + (G.worn ? G.worn.size : 0) * 10);
 function fitPack() { const n = packCap(); if (inv.length < PACK_MAX) for (let i = inv.length; i < PACK_MAX; i++) inv[i] = null; const over = []; for (let i = n; i < PACK_MAX; i++) if (inv[i]) { over.push(inv[i]); inv[i] = null; } INV_N = n; for (const s of over) { const l = addItem(s.id, s.n); if (l && G.p) spawnDrop(s.id, l, G.p.x + 3, G.p.y + 4); } }
 function addItem(id, n = 1) {

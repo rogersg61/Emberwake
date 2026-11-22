@@ -45,15 +45,16 @@ function wireDC(P, dc) {
 }
 // key: a message that only says where something is now; a newer one replaces it if it hasn't left yet
 function sendTo(P, m, key) {
-  if (!P) return; const dc = dcOpen(P); if (!dc && !P.relay) return;
+  if (!P) return false; const dc = dcOpen(P); if (!dc && !P.relay) return false;
   const s = typeof m === 'string' ? m : JSON.stringify(m), out = [];
   if (s.length > 15000) { const id = ++COOP.pid, n = ceil(s.length / 15000); for (let k = 0; k < n; k++) out.push(JSON.stringify({ t: '_p', id, k, n, s: s.slice(k * 15000, (k + 1) * 15000) })); } else out.push(s);
   if (dc) {
     // the direct line came up while the relay was busy: wait until the relay is clear, so nothing arrives out of turn
-    if (P.relay && (P.rq.length || P.rw.size || P.rbusy || (P.hold && P.hold.length))) { const H = P.hold || (P.hold = []); for (const x of out) H.push(x); if (H.length > 3000) rlyHoldFlush(P, true); return; }
-    try { for (const x of out) P.dc.send(x); return; } catch (e) { if (!P.relay) return; }
+    if (P.relay && (P.rq.length || P.rw.size || P.rbusy || (P.hold && P.hold.length))) { const H = P.hold || (P.hold = []); for (const x of out) H.push(x); if (H.length > 3000) rlyHoldFlush(P, true); return true; }
+    try { for (const x of out) P.dc.send(x); return true; } catch (e) { if (!P.relay) return false; }
   }
   for (const x of out) rlyQueue(P, x, out.length === 1 ? key : '');
+  return true;
 }
 function sendAll(m, except, key) { const s = JSON.stringify(m); for (const P of COOP.peers.values()) if (P !== except && P.ok && !P.ghostPeer) sendTo(P, s, key); }
 function onRaw(P, data) {
@@ -228,8 +229,8 @@ function guestLegacyKey() { return 'ew2.guest.' + WORLD.id; }
 function guestKey() { return ACCOUNT.active ? profileKey('guest.' + WORLD.id) : guestLegacyKey(); }
 function guestSave() {
   if (!netGuest() || !G.p || !WORLD.id) return;
-  const o = { v: 1, inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '',
-    food: r1(G.food), mast: G.mast || {}, fight: fightSave(), pairs: [...(G.pairsKnown || [])], known: [...G.known], used: [...G.movesUsed], flags: G.flags || {}, quality: G.quality || {}, hp: round(G.p.hp), skin: G.skin | 0, beasts: G.beasts || {}, kills: G.kills | 0, journal: G.journal || [], boons: trinkSave() };
+  const o = { v: 1, inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '', sel: G.sel | 0,
+    food: r1(G.food), mast: G.mast || {}, fight: fightSave(), pairs: [...(G.pairsKnown || [])], known: [...G.known], used: [...G.movesUsed], flags: G.flags || {}, quality: G.quality || {}, hp: round(G.p.hp), skin: G.skin | 0, hat: G.hat | 0, beasts: G.beasts || {}, kills: G.kills | 0, journal: G.journal || [], boons: trinkSave() };
   LS.set(guestKey(), JSON.stringify(o));
 }
 function guestLoad() {
@@ -253,6 +254,9 @@ function guestLoad() {
   if (Array.isArray(o.gear)) GEAR_SLOTS.forEach((s, k) => { const id = o.gear[k]; if (IT[id] && IT[id].type === 'armor' && IT[id].slot === s) G.gear[s] = { id, n: 1 }; });
   if (IT[o.off] && IT[o.off].type === 'weapon') G.gear.off = { id: o.off, n: 1 };
   trinkLoad(o.boons);
+  G.skin = clamp(o.skin | 0, 0, SKINS.length - 1);
+  G.hat = clamp(o.hat | 0, 0, 7);
+  G.sel = clamp(o.sel | 0, 0, max(0, INV_N - 1));
   G.food = clamp(num(o.food, 100), 0, 100); if (o.mast && typeof o.mast === 'object') for (const k in o.mast) if (STYLES[k] && isFinite(o.mast[k])) G.mast[k] = +o.mast[k];
   G.pairsKnown = new Set(Array.isArray(o.pairs) ? o.pairs.filter(isStyleId) : []); G.known = new Set(Array.isArray(o.known) ? o.known : []); G.movesUsed = new Set(Array.isArray(o.used) ? o.used : []);
   G.flags = o.flags && typeof o.flags === 'object' ? o.flags : {}; G.quality = o.quality && typeof o.quality === 'object' ? o.quality : {}; G.beasts = o.beasts && typeof o.beasts === 'object' ? o.beasts : {}; G.kills = o.kills | 0;
@@ -403,24 +407,41 @@ function eSer(e) {
   }
   return o;
 }
-function delta(cur, last) { const d = {}; for (const k in cur) { const a = cur[k], b = last[k]; if (a === b) continue; if (a && typeof a === 'object' && b && JSON.stringify(a) === JSON.stringify(b)) continue; d[k] = a; } return d; }
+function delta(cur, last) {
+  const d = {};
+  for (const k in cur) { const a = cur[k], b = last[k]; if (a === b) continue; if (a && typeof a === 'object' && b && JSON.stringify(a) === JSON.stringify(b)) continue; d[k] = a; }
+  for (const k in last) if (!(k in cur)) d[k] = null;
+  return d;
+}
 function sendFoes(P) {
-  const f = P.f; if (!f) return; const seen = P.seen, live = new Set(), e1 = [];
+  const f = P.f; if (!f) return; const seen = P.seen, live = new Set(), e1 = [], curSeen = new Map();
   for (const e of G.enemies) {
     if (e.dead || e.type === 'dummy' || abs(e.x - f.x) > FOE_RX || abs(e.y - f.y) > FOE_RY) continue; if (!e.nid) e.nid = COOP.nid++; live.add(e.nid);
-    const cur = eSer(e), last = seen.get(e.nid); if (!last) e1.push([e.nid, cur, 1]); else { const d = delta(cur, last); if (Object.keys(d).length) e1.push([e.nid, d, 0]); } seen.set(e.nid, cur);
+    const cur = eSer(e), last = seen.get(e.nid); if (!last) e1.push([e.nid, cur, 1]); else { const d = delta(cur, last); if (Object.keys(d).length) e1.push([e.nid, d, 0]); }
+    curSeen.set(e.nid, cur);
   }
-  const gone = []; for (const id of seen.keys()) if (!live.has(id)) { gone.push(id); seen.delete(id); }
+  const gone = []; for (const id of seen.keys()) if (!live.has(id)) gone.push(id);
   const hs = [], hnow = new Set();
   for (const h of G.fighters) { if (!h.hollow || h.remote || h.gone || abs(h.x - f.x) > FOE_RX || abs(h.y - f.y) > FOE_RY) continue; if (!h.nid) h.nid = COOP.nid++; hnow.add(h.nid); const s = fighterState(h); s.n = h.name; s.sk = h.skin; hs.push([h.nid, s]); }
   const hx = []; for (const id of P.hseen) if (!hnow.has(id)) { hx.push(id); P.hseen.delete(id); } for (const id of hnow) P.hseen.add(id);
-  if (e1.length || gone.length || hs.length || hx.length) sendTo(P, { t: 'foes', e: e1, x: gone, h: hs, hx });
+  if (e1.length || gone.length || hs.length || hx.length) {
+    if (sendTo(P, { t: 'foes', e: e1, x: gone, h: hs, hx })) {
+      for (const [id, cur] of curSeen) seen.set(id, cur);
+      for (const id of gone) seen.delete(id);
+    }
+  }
 }
 function onFoes(m) {
   for (const q of Array.isArray(m.e) ? m.e : []) {
     const id = q[0], d = q[1]; if (!d || typeof d !== 'object') continue; let g = COOP.ghosts.get(id);
     if (!g) { if (!q[2] || typeof d.type !== 'string') continue; g = { ghost: true, nid: id, x: num(d.x), y: num(d.y), px: num(d.x), py: num(d.y), vx: 0, vy: 0, w: 8, h: 8, hp: 1, maxhp: 1, flash: 0, t: 0, dead: false }; COOP.ghosts.set(id, g); G.enemies.push(g); }
-    for (const k in d) { let v = d[k]; if (k === 'x' || k === 'y') continue; if (plainObj(v)) { if (v.$e !== undefined) { const r = COOP.ghosts.get(v.$e); if (!r) (g._ref || (g._ref = {}))[k] = v.$e; v = r || null; } else v = Object.assign({}, v); } g[k] = v; }
+    for (const k in d) {
+      let v = d[k];
+      if (k === 'x' || k === 'y') continue;
+      if (v === null) { delete g[k]; continue; }
+      if (plainObj(v)) { if (v.$e !== undefined) { const r = COOP.ghosts.get(v.$e); if (!r) (g._ref || (g._ref = {}))[k] = v.$e; v = r || null; } else v = Object.assign({}, v); }
+      g[k] = v;
+    }
     if (d.x !== undefined) g.ax = num(d.x); if (d.y !== undefined) g.ay = num(d.y); g.heardT = 0; g.dead = false;
     if (g.boss && !G.boss) G.boss = g;
   }

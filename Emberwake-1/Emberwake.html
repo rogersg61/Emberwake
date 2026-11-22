@@ -3180,7 +3180,16 @@ const DPLACE = {
 //  from beasts, and from what you make of them at the right station.
 // ============================================================
 const IT = {};
-function defI(id, o) { IT[id] = Object.assign({ id, name: id, stack: 999, type: 'mat', desc: '' }, o); }
+function defI(id, o) {
+  const base = Object.assign({ id, name: id, stack: 999, type: 'mat', desc: '' }, o);
+  if (base.wt === undefined) {
+    base.wt = base.type === 'weapon' ? 2.5 : base.type === 'armor' ? 1.5 : base.type === 'tool' ? 1.2 :
+      base.type === 'block' || base.type === 'wall' ? .9 : base.type === 'trinket' ? .35 :
+      base.type === 'food' || base.type === 'heal' ? .2 : base.type === 'util' ? .45 :
+      base.type === 'offering' ? 1 : base.type === 'summon' ? .25 : .1;
+  }
+  IT[id] = base;
+}
 // small icon templates: a/b/c/d run light to dark, e and f are accents, w is white
 const ICT = {
   nug: ['..ab...', '.abbc..', 'abebcc.', 'bbbccd.', '.bccdd.', '..dd...'],
@@ -3264,13 +3273,16 @@ const icon = (t, p) => outlined(spr(ICT[t], typeof p === 'string' ? PAL[p] : p))
 function buildItems() {
   const M = (id, name, ic, pal, desc, o) => defI(id, Object.assign({ name, icon: icon(ic, pal), desc }, o));
   // the old weapons of the story (found, given or taken)
-  const wp = (id, name, set, dmg, len, icon, held, grip, desc, o) => defI(id, Object.assign({ name, type: 'weapon', set, dmg, len, stack: 1, icon, held, grip, desc }, o));
+  const wp = (id, name, set, dmg, len, icon, held, grip, desc, o) => {
+    const wt = set === 'maul' ? 3.8 : set === 'bow' ? 2 : set === 'spear' ? 2.8 : set === 'chuks' ? 2 : set === 'fangs' ? 1.8 : set === 'brawl' ? 0 : 2.4;
+    defI(id, Object.assign({ name, type: 'weapon', set, dmg, len, wt, stack: 1, icon, held, grip, desc, ammo: set === 'bow' && id !== 'bow' }, o));
+  };
   wp('sword', "Waker's Blade", 'sword', 11, 15, SPR.i_sword, SPR.w_sword, [2, 2], 'Rusted, but it remembers every form.');
   wp('kblade', 'Kindled Blade', 'sword', 17, 15, SPR.i_kblade, SPR.w_kblade, [2, 2], 'Reforged in emberlight. It burns to be used.', { glow: true });
   wp('spear', 'Ashwood Pike', 'spear', 10, 22, SPR.i_spear, SPR.w_spear, [8, 2], 'Long reach. Thrusts, vaults and sweeps.');
   wp('fangs', 'Twinfangs', 'fangs', 7, 9, SPR.i_fangs, SPR.w_fangs, [2, 2], 'A blade in each hand. Fast, close, relentless.', { dual: true });
   wp('maul', "Warden's Knuckle", 'maul', 19, 17, SPR.i_maul, SPR.w_maul, [3, 4], 'Slow and enormous. Heavy forms shrug off blows.');
-  wp('bow', 'Dawnstring', 'bow', 9, 9, SPR.i_bow, SPR.w_bow, [7, 10], 'Looses arrows of light. It never runs dry.');
+  wp('bow', 'Dawnstring', 'bow', 9, 9, SPR.i_bow, SPR.w_bow, [7, 10], 'Looses enchanted light arrows. It never runs dry.');
   wp('vpike', "Vesper's Glasspike", 'spear', 14, 22, outlined(SPR.w_vpike), SPR.w_vpike, [8, 2], 'Cold to hold.', { cold: true });
   wp('vfangs', 'Mirror Fangs', 'fangs', 10, 9, outlined(SPR.w_vfangs), SPR.w_vfangs, [2, 2], 'Cold to hold.', { dual: true, cold: true });
   wp('nunchaku', 'Rattlechain', 'chuks', 8, 12, SPR.i_nunchaku, null, [0, 0], 'Two sticks and a chain. Quick, snapping, and cruel to a pinned foe.', { chuks: true });
@@ -3383,8 +3395,9 @@ function buildItems() {
   U('whetstone', 'Whetstone', 'whet', 'whet', 'whet', 'Click to hone your held weapon: +20% damage for 40 blows.', { stack: 10 });
   U('waystone', 'Waystone', 'stone', 'way', 'place', 'Place it. Touch any waystone to travel to another you have raised.', { type: 'block', tile: WAYSTONE, stack: 5 });
   // ---- building ----
-  const blk = (id, name, tile, desc = 'Placeable block.', o) => defI(id, Object.assign({ name, type: 'block', tile, icon: outlined(TEX[tile][0]), desc }, o));
-  const wal = (id, name, w, desc) => defI(id, { name, type: 'wall', wall: w, icon: outlined(WTEX[w][0]), desc: desc || 'A back wall. Blocks the sky, keeps a room a room.' });
+  const BLOCK_WT = { plank: .7, brick: 1.2, platform: .55, packed: .8, cobble: 1.1, cutstone: 1.5, mudbrick: .9, logwall: 1.3, wattle: .7, thatch: .35, cinderbrick: 1.6, window: .6, beam: 1.1, beamh: 1.1, door: 1.2, ladder: .5, bedroll: .8, charge: 1.8, waystone: 3 };
+  const blk = (id, name, tile, desc = 'Placeable block.', o) => defI(id, Object.assign({ name, type: 'block', tile, wt: BLOCK_WT[id] || .9, icon: outlined(TEX[tile][0]), desc }, o));
+  const wal = (id, name, w, desc) => defI(id, { name, type: 'wall', wall: w, wt: { wplank: .7, wlog: 1.3, wwattle: .7, wmud: .9, wcobble: 1.1, wcut: 1.5, wbrick: 1.2 }[id] || 1, icon: outlined(WTEX[w][0]), desc: desc || 'A back wall. Blocks the sky, keeps a room a room.' });
   blk('plank', 'Stalkwood Planks', PLANK); blk('brick', 'Forge Brick', BRICK, 'Kiln-fired brick. Bloomeries are built of it.');
   blk('platform', 'Rope Bridge', PLATFORM, 'Jump up through it. Hold S to drop.');
   blk('packed', 'Packed Earth', PACKED, 'Rammed loam. Cheap, holds a little.'); blk('cobble', 'Cobble', COBBLE, 'Rock set in mortar. Strong upward, weak across.');
@@ -3395,10 +3408,10 @@ function buildItems() {
   blk('beamh', 'Beam', BEAMH, 'A horizontal timber. Spans wide gaps. Stand on it.'); blk('door', 'Door', DOORC, 'Needs three tall clear tiles. [F] or right-click opens it.');
   blk('ladder', 'Ladder', LADDER, 'Climb with W and S.');
   wal('wplank', 'Plank Wall', W_PLANK); wal('wlog', 'Log Back Wall', W_LOG); wal('wwattle', 'Wattle Wall', W_WATTLE); wal('wmud', 'Mudbrick Wall', W_MUDB); wal('wcobble', 'Cobble Wall', W_COBBLE); wal('wcut', 'Cut Stone Wall', W_CUT); wal('wbrick', 'Brick Wall', W_BRICK);
-  defI('torch', { name: 'Pod Lantern', type: 'block', tile: TORCH, icon: SPR.i_torch, desc: 'Warm light. Hang it on walls or blocks.' });
-  const st = (id, name, tile, desc) => defI(id, { name, type: 'block', tile, stack: 20, icon: STN_SPR[tile] ? outlined(STN_SPR[tile].img) : null, desc });
-  defI('bench', { name: 'Workbench', type: 'block', tile: BENCH, icon: SPR.i_bench, stack: 20, desc: 'Woodwork. Saw with the mouse: long strokes, not frantic ones.' });
-  defI('furnace', { name: 'Kiln', type: 'block', tile: FURNACE, icon: SPR.i_furnace, stack: 20, desc: 'Fires pottery and brick, bakes charcoal, melts glass. Feed it and work the damper.' });
+  defI('torch', { name: 'Pod Lantern', type: 'block', tile: TORCH, wt: .25, icon: SPR.i_torch, desc: 'Warm light. Hang it on walls or blocks.' });
+  const st = (id, name, tile, desc) => defI(id, { name, type: 'block', tile, wt: 2.5, stack: 20, icon: STN_SPR[tile] ? outlined(STN_SPR[tile].img) : null, desc });
+  defI('bench', { name: 'Workbench', type: 'block', tile: BENCH, icon: SPR.i_bench, wt: 2.2, stack: 20, desc: 'Woodwork. Saw with the mouse: long strokes, not frantic ones.' });
+  defI('furnace', { name: 'Kiln', type: 'block', tile: FURNACE, icon: SPR.i_furnace, wt: 3.2, stack: 20, desc: 'Fires pottery and brick, bakes charcoal, melts glass. Feed it and work the damper.' });
   st('campfire', 'Campfire', FIRE, 'Cook on it. Lit with flint. Feed it sticks, logs, peat or coal.'); st('chest', 'Chest', CHEST, 'Holds 20 stacks.');
   st('wheel', 'Potter\'s Wheel', WHEEL, 'Throw clay into jugs, crucibles and cauldrons.'); st('quern', 'Quern', QUERN, 'Grind by circling the mouse around the stone.');
   st('bloomery', 'Bloomery', BLOOMERY, 'Smelts ore with charcoal or coal. Pump the bellows to hold the heat.'); st('anvil', 'Stone Anvil', ANVIL, 'Smith sunmetal and bronze. Strike on the marks.');
@@ -3412,7 +3425,7 @@ function buildItems() {
   defI('flask', { name: 'Ember Flask', type: 'arm', icon: SPR.i_flask, stack: 30, desc: '[R] throw. Bursts into fire that clings.' });
   defI('smoke', { name: 'Smoke Pellet', type: 'arm', icon: SPR.i_smoke, stack: 30, desc: '[R] throw. Blinds whoever is caught in the cloud.' });
   M('frostflask', 'Frost Flask', 'jug', { a: '#ffffff', b: '#c9fff6', c: '#62a9bc', d: '#2a5a6a', e: '#ffffff' }, '[R] throw. Bursts into cold that slows everything it touches.', { type: 'arm', stack: 30 });
-  M('arrow', 'Arrow', 'arrow', { a: '#e8edf2', b: '#8a6a48', e: '#f4efe6' }, 'Crafted bows need them. Dawnstring does not.', { stack: 300 });
+  M('arrow', 'Arrow', 'arrow', { a: '#e8edf2', b: '#8a6a48', e: '#f4efe6' }, 'Fletched projectiles for every bow, including Dawnstring.', { stack: 300, wt: .025 });
   defI('wember', { name: "Warden's Ember", type: 'relic', stack: 1, icon: SPR.i_wember, desc: 'The first ember. Jump again in mid-air.' });
   defI('wember2', { name: 'Still Ember', type: 'relic', stack: 1, icon: SPR.i_wember2, desc: 'The second ember. Dodge twice in mid-air.' });
   defI('wember3', { name: 'Deep Ember', type: 'relic', stack: 1, icon: SPR.i_wember3, desc: 'The third ember. Molten cinder will not burn you.' });
@@ -3576,6 +3589,23 @@ function buildUses() {
 const PACK0 = 20, PACK_MAX = 50;
 let INV_N = PACK0;
 let inv = [];
+const CARRY_AT = [25, 55, 85];
+const CARRY_CLASS = [
+  { n: 'LIGHT', col: '#7ddc6f', walk: 1, jump: 1, dodge: 1, light: 1, heavy: 1, air: 1, dash: 1, bow: 1, mine: 1, swing: 1, st: 1, d: 'carrying comfortably' },
+  { n: 'MEDIUM', col: '#ffd35a', walk: .97, jump: .99, dodge: .96, light: .98, heavy: 1.02, air: .96, dash: .97, bow: .98, mine: .97, swing: 1.02, st: .96, d: 'a little encumbered' },
+  { n: 'HEAVY', col: '#ff8a3d', walk: .88, jump: .94, dodge: .86, light: .92, heavy: 1.05, air: .88, dash: .88, bow: .9, mine: .92, swing: 1.08, st: .86, d: 'heavy pack: slower movement and stamina' },
+  { n: 'OVERLOADED', col: '#e2483b', walk: .76, jump: .86, dodge: .68, light: .86, heavy: 1.08, air: .78, dash: .76, bow: .82, mine: .84, swing: 1.12, st: .72, d: 'overloaded: drop some items to move freely' }
+];
+function carryStats() {
+  let wt = 0;
+  for (let i = 0; i < INV_N; i++) {
+    if (i === G.sel) continue;
+    const s = inv[i];
+    if (s && IT[s.id]) wt += (IT[s.id].wt || 0) * s.n;
+  }
+  const ci = wt <= CARRY_AT[0] ? 0 : wt <= CARRY_AT[1] ? 1 : wt <= CARRY_AT[2] ? 2 : 3;
+  return { wt: round(wt * 10) / 10, ci, cls: CARRY_CLASS[ci] };
+}
 const packCap = () => WORLD.arena ? 10 : WORLD.mode === 1 ? PACK_MAX : min(PACK_MAX, PACK0 + (G.worn ? G.worn.size : 0) * 10);
 function fitPack() { const n = packCap(); if (inv.length < PACK_MAX) for (let i = inv.length; i < PACK_MAX; i++) inv[i] = null; const over = []; for (let i = n; i < PACK_MAX; i++) if (inv[i]) { over.push(inv[i]); inv[i] = null; } INV_N = n; for (const s of over) { const l = addItem(s.id, s.n); if (l && G.p) spawnDrop(s.id, l, G.p.x + 3, G.p.y + 4); } }
 function addItem(id, n = 1) {
@@ -3688,7 +3718,8 @@ function buildWeapons() {
     if (T0.rows) { const pal = { h: M.h, p: M.g, g: M.g, w: M.w, b: M.b, B: M.B, x: M.x }; held = spr(T0.rows, pal); grip = T0.grip; }
     else if (T0.bow) { held = bowSpr(T0.bow, M, T0.curl); grip = [7, T0.bow >> 1]; }
     else nun = { st: mt === 'bone' ? '#e6dccc' : M.h, cap: M.x, l1: M.w, l2: M.B, end: T0.nun, n: T0.nun === 'blade' ? 5 : T0.nun === 'ball' ? 4 : 3, head: M.b };
-    const o = { name: `${M.n} ${T0.n}`, type: 'weapon', set: T0.set, dmg, len: T0.len, wsp: T0.sp, stack: 1, held, grip, dual: !!T0.dual, desc: [T0.d, M.t].filter(Boolean).join(' '), tier: mt, wtype: ty };
+    const wt = round((.65 + T0.sz * .55 + (T0.set === 'maul' ? .7 : T0.set === 'spear' ? .35 : 0)) * 10) / 10;
+    const o = { name: `${M.n} ${T0.n}`, type: 'weapon', set: T0.set, dmg, len: T0.len, wt, wsp: T0.sp, stack: 1, held, grip, dual: !!T0.dual, desc: [T0.d, M.t].filter(Boolean).join(' '), tier: mt, wtype: ty };
     for (const k of ['bleed', 'poison', 'frost', 'burn', 'steal', 'glow', 'cold', 'stag']) if (M[k] || T0[k]) o[k] = max(M[k] || 0, T0[k] || 0) || M[k] || T0[k];
     o.crit = (M.crit || 0) + (T0.crit || 0);
     if (T0.set === 'bow') o.ammo = true;
@@ -5085,7 +5116,7 @@ function buildArmor() {
 
 // ---------------- what you are wearing, summed up ----------------
 let GEAR_C = null;
-function gearKey() { const W = G.p && heldOf(G.p); return GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : '').join(',') + '|' + (W && W.type === 'weapon' ? W.id || W.name : '') + '|' + (G.p && G.p.mastery ? 1 : 0); }
+function gearKey() { const W = G.p && heldOf(G.p); const off = G.gear && G.gear.off ? G.gear.off.id : ''; return GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : '').join(',') + '|' + (W && W.type === 'weapon' ? W.id || W.name : '') + '|' + off + '|' + (G.p && G.p.mastery ? 1 : 0); }
 function gearStats() {
   const key = gearKey(); if (GEAR_C && GEAR_C.key === key) return GEAR_C;
   const g = { key, prot: 0, wt: 0, res: {}, mats: {}, tags: new Set(), mine: 1, poise: 1, shot: 1 };
@@ -5098,7 +5129,9 @@ function gearStats() {
   for (const m in g.mats) if (g.mats[m] === 4 && AMAT[m]) { g.set = m; g.tags.add(AMAT[m].gift); for (const k in AMAT[m].res || {}) g.res[k] = AMAT[m].res[k]; }
   if (g.tags.has('bright')) { g.tags.add('light'); g.mine *= 1.1; }
   if (g.res.heat) g.tags.add('heat');
-  const W = G.p && heldOf(G.p), ww = W && W.type === 'weapon' && !W.fist ? (W.wtype && WTYPE[W.wtype] ? WTYPE[W.wtype].sz : SET_WT[W.set] || 2) : 0;
+  const W = G.p && heldOf(G.p), heldWeight = W && W.type === 'weapon' && !W.fist ? (W.wt !== undefined ? W.wt : W.wtype && WTYPE[W.wtype] ? WTYPE[W.wtype].sz : SET_WT[W.set] || 2) : 0;
+  const off = G.gear && G.gear.off && IT[G.gear.off.id], offWeight = off && off.type === 'weapon' && !off.fist ? (off.wt !== undefined ? off.wt : SET_WT[off.set] || 2) : 0;
+  const ww = heldWeight + offWeight;
   g.load = g.wt + ww; g.ci = g.load <= WCLASS_AT[0] ? 0 : g.load <= WCLASS_AT[1] ? 1 : g.load <= WCLASS_AT[2] ? 2 : 3; g.cls = WCLASS[g.ci];
   g.prot = round(g.prot); g.dr = g.prot / (g.prot + 60);
   return GEAR_C = g;
@@ -5106,6 +5139,7 @@ function gearStats() {
 const gearOn = () => !WORLD.arena && !!G.p;
 function gearMul(kind) {
   if (!gearOn()) return blessMul(kind); const g = gearStats(); let v = (g.cls[kind] !== undefined ? g.cls[kind] : 1) * blessMul(kind);
+  const c = carryStats(); if (c.cls[kind] !== undefined) v *= c.cls[kind];
   if (kind === 'mine') v *= g.mine;
   if (kind === 'poise') v *= g.poise * (g.tags.has('bulwark') ? .5 : 1);
   if (kind === 'walk' && g.tags.has('swift')) v *= 1.08;
@@ -5171,7 +5205,7 @@ function wearAt(i) { const s = inv[i]; if (!s) return; const it = IT[s.id]; if (
 function drawGearPanel(c, x, y) {
   if (!SLOT_G) { SLOT_G = {}; for (const k in SLOT_GLYPH) SLOT_G[k] = spr(SLOT_GLYPH[k], { a: '#3d3a52' }); }
   const g = gearStats(); let tip = null;
-  panel(c, x - 5, y - 16, 199, 76, 'WORN'); hit(x - 5, y - 16, 199, 76, () => { });
+  panel(c, x - 5, y - 16, 199, 96, 'WORN'); hit(x - 5, y - 16, 199, 96, () => { });
   GEAR_SLOTS.forEach((s, k) => {
     const sx = x + k * 19, sy = y, hov = inR(sx, sy, 18, 18), cur = G.gear[s], h = UI.held, fits = h && IT[h.id] && IT[h.id].type === 'armor' && IT[h.id].slot === s;
     slotBox(c, sx, sy, fits, hov); if (cur) drawStack(c, cur, sx, sy); else c.drawImage(SLOT_G[s], sx + 6, sy + 7);
@@ -5181,9 +5215,10 @@ function drawGearPanel(c, x, y) {
   { const sx = x + 80, hov = inR(sx, y, 18, 18), cur = G.gear.off, h = UI.held, fits = h && IT[h.id] && IT[h.id].type === 'weapon'; slotBox(c, sx, y, fits, hov); if (cur) drawStack(c, cur, sx, y); else drawText(c, 'OFF', sx + 3, y + 6, '#3d3a52'); if (hov && cur && !h) tip = itemTip(IT[cur.id]); else if (hov && !cur && !h) tip = [['OFF HAND', '#ffd35a'], ['A second weapon. [X] swaps it into your hand. Swap right after a style lands for a pair finisher.', '#b9bdd0']]; hit(sx, y, 18, 18, () => gearSlotClick('off')); }
   const tx = x + 104; textS(c, `PROT ${g.prot}`, tx, y - 1, '#e8edf2'); textS(c, `-${round(g.dr * 100)}%`, tx + 50, y - 1, '#8b8fa3');
   textS(c, `LOAD ${round(g.load * 10) / 10}`, tx, y + 8, '#e8edf2'); textS(c, g.cls.n, tx + 50, y + 8, g.cls.col);
-  if (g.set) textS(c, AMAT[g.set].set.split(':')[0].toUpperCase() + ' SET', tx, y + 17, '#ffd35a');
-  drawText(c, wrapText(g.cls.d, 188)[0] || '', x - 2, y + 21, '#6a6485');
-  { const t2 = drawTrinketRow(c, x, y + 31); if (t2) tip = t2; }
+  const cary = carryStats();   textS(c, `CARRY ${cary.wt}`, tx, y + 17, '#e8edf2'); textS(c, cary.cls.n, tx + 50, y + 17, cary.cls.col);
+  if (g.set) textS(c, AMAT[g.set].set.split(':')[0].toUpperCase() + ' SET', tx, y + 26, '#ffd35a');
+  drawText(c, wrapText(g.cls.d + '  ' + cary.cls.d, 188)[0] || '', x - 2, y + 35, '#6a6485');
+  { const t2 = drawTrinketRow(c, x, y + 44); if (t2) tip = t2; }
   return tip;
 }
 function drawGearHud(c) {
@@ -5722,9 +5757,13 @@ function startAttack(f, btn, I, force) {
   const rep = f.hist.slice(-4).filter(h => h === id).length, fresh = !f.hist.slice(-3).includes(id);
   f.hist.push(id); if (f.hist.length > 8) f.hist.shift();
   f.face = c.side; f.state = 'attack'; f.chainT = 0; f.mineP = 0;
-  const a = f.atk = { f, id, m, W, set, setName: W.set, btn, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
+  const timing = f.atkTiming || 'normal';
+  f.atkTiming = null;
+  const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
+  const timingMul = timing === 'perfect' ? 1.12 : timing === 'rushed' ? .92 : timing === 'steady' ? 1.03 : 1;
+  a.gm = (a.gm || 1) * timingMul;
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -5880,7 +5919,8 @@ function applyHit(a, e, hx, hy) {
   const f = a.f, m = a.m, root = e.root || e, last = a.hits.get(root);
   if (last !== undefined && (!m.multi || a.pt - last < m.multi)) return; a.hits.set(root, a.pt);
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
-  const crit = a.crit || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
+  const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
+  const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
   let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
   const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
   dmg = max(1, round(dmg * frand(.93, 1.07)));
@@ -6822,7 +6862,7 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
-    kills: 0, deaths: 0, foes: [], atkN: 0
+    kills: 0, deaths: 0, foes: [], atkN: 0, lightHoldCd: 0, heavyHoldCd: 0
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -6895,6 +6935,7 @@ function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
+  if (f.lightHoldCd > 0) f.lightHoldCd--; if (f.heavyHoldCd > 0) f.heavyHoldCd--;
   if (f.chainT > 0) f.chainT--; if (f.hurtT > 0) f.hurtT--; if (f.landT > 0) f.landT--; if (f.healCd > 0) f.healCd--; if (f.placeCd > 0) f.placeCd--;
   if (f.takenT > 0 && --f.takenT <= 0) f.taken = 0;
   if (f.armCd > 0) f.armCd--; if (f.throwT > 0) f.throwT--; if (f.veil > 0) f.veil--;
@@ -6909,16 +6950,29 @@ function tickFighter(f, I) {
   if (WORLD.arena && !WORLD.royale) { if (f.regenT > 240 && f.hp < f.maxhp && G.time % 4 === 0) f.hp++; }
   else if (f.isPlayer && f.regenT > 420 / DIFF().regen && G.time % max(1, round((WORLD.mode === 1 || G.food > 70 ? 40 : G.food > 30 ? 80 : 1e9) / DIFF().regen / blessRegen())) === 0 && f.hp < f.maxhp) f.hp++;
   const W = heldOf(f), isW = W && W.type === 'weapon', free = f.hurtT <= 0;
-  if (isW && free) { if (I.lp) f.buf = { b: 'L', t: 10 }; else if (f === G.p && I.l && f.state === 'normal' && !f.buf && !(f.toolT > 0)) f.buf = { b: 'L', t: 2 }; if (I.rp) f.buf = { b: 'H', t: 10 }; }
+  if (isW && free) {
+    if (I.lp) f.buf = { b: 'L', t: 10 };
+    else if (I.l && f.state === 'normal' && f.lightHoldCd <= 0) { f.buf = { b: 'L', t: 2 }; f.lightHoldCd = 12; }
+    if (I.rp) f.buf = { b: 'H', t: 10 };
+    else if (I.r && f.state === 'normal' && f.heavyHoldCd <= 0) { f.buf = { b: 'H', t: 2 }; f.heavyHoldCd = 16; }
+  }
   if (f.buf && --f.buf.t < 0) f.buf = null;
   if (I.dodgeP) f.dbuf = 7; else if (f.dbuf > 0) f.dbuf--;
   let a = f.atk;
   if (f.dbuf > 0 && f.dodgeCd <= 0 && f.hurtT <= 0 && f.stam >= 12 && (f.state === 'normal' || (f.state === 'attack' && (a.phase === 2 || (a.phase === 0 && a.charge > 0)))) && (f.onGround || f.coyote > 0 || f.airDash > 0)) startDodge(f, I.md, I);
   if (f.buf && f.hurtT <= 0) {
     a = f.atk; const ok = f.state === 'normal' || (f.state === 'dodge' && f.dodgeT >= 2) || (f.state === 'attack' && a.phase === 2 && a.pt >= floor(a.m.rec * .38));
-    if (ok) { const b = f.buf.b; f.buf = null; if (f.state === 'attack') endAttack(f); if (startAttack(f, b, I)) f.atkN++; }
+    if (ok) {
+      const b = f.buf.b; f.buf = null;
+      if (f.state === 'attack') {
+        const rec = max(1, round(a.m.rec * (a.tm || a.W.wsp || 1))), prog = clamp(a.pt / rec, 0, 1);
+        f.atkTiming = prog >= .55 && prog <= .82 ? 'perfect' : prog < .55 ? 'rushed' : 'steady';
+        endAttack(f);
+      } else f.atkTiming = 'normal';
+      if (startAttack(f, b, I)) f.atkN++;
+    }
   }
-  let grav = .26; const gp = f === G.p && gearOn(), maxV = 1.45 * (gp ? gearMul('walk') : 1);
+  let grav = .26; const gp = f === G.p && gearOn(), maxV = 1.45 * (gp ? gearMul('walk') : 1) * (f.brBoost > 0 ? 1.12 : 1);
   if (gp && f.vy > 0 && (gearHas('feather') || gearHas('prismatic')) && I.jumpH && !f.onGround) grav = .17;
   if (f.state === 'dodge') {
     f.dodgeT++; f.vx = f.dodgeDir * 3.5 * (f.dodgeT > 8 ? .7 : 1) * (f === G.p ? gearMul('dodge') : 1); if (!f.dodgeGround) { f.vy = 0; grav = 0; }
@@ -9033,6 +9087,7 @@ function drawTip(c, lines) {
 }
 function itemTip(it) {
   const L = [[it.name, '#ffd35a']];
+  if (it.wt !== undefined) L.push([`weight ${it.wt} per item`, '#b9bdd0']);
   if (it.type === 'weapon') {
     const q = qBonus(it.id), tr = ['bleed', 'poison', 'frost', 'burn', 'steal', 'stag'].filter(k => it[k]).map(k => ({ bleed: 'bleeds', poison: 'poisons', frost: 'chills', burn: 'burns', steal: 'drinks life', stag: 'staggers' }[k]));
     L.push([`${it.dmg} damage${q ? ` (${q > 0 ? '+' : ''}${round(q * 100)}% ${QN[qTier(G.quality[it.id])].toLowerCase()})` : ''}${it.wsp ? (it.wsp < .95 ? ', quick' : it.wsp > 1.08 ? ', slow' : '') : ''}`, '#fff']);
@@ -10371,7 +10426,7 @@ function arenaTick() {
 //  storm clock and the echoes; every computer runs its own Waker and
 //  shares it as presence, exactly like the Cinder Ring.
 // ============================================================
-const BRW = 520, BRH = 140, BRSKY = 17, BR_MAX = 12, BR_FILL = 8;
+const BRW = 900, BRH = 160, BRSKY = 17, BR_MAX = 12, BR_FILL = 8;
 const BR_TIERS = ['COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY'], BR_TCOL = ['#c8c4d4', '#7ddc6f', '#5aa8ff', '#c77dff', '#ffd35a'];
 const BR_MATT = { wood: 0, flint: 0, bone: 0, stone: 0, copper: 1, bronze: 1, rust: 2, chitin: 2, iron: 2, steel: 3, glass: 3, deep: 4, ember: 4 };
 const BR_OLD = { sword: 0, spear: 0, fangs: 1, maul: 2, bow: 1, nunchaku: 1, kblade: 4, kmaul: 4, vpike: 3, vfangs: 3 };
@@ -10382,12 +10437,12 @@ const BR_PNAMES = { moor: ['HEARTHWICK', 'MILLSTEAD', 'LANTERN GREEN'], thorn: [
 const BR_BOTN = ['WREN', 'KESTREL', 'MARROW', 'TINDER', 'SORREL', 'FLINT', 'ROOK', 'BRAMBLE', 'EMBERLY', 'SALTWICK', 'HOLLIS', 'VESK', 'ODA', 'TALLOW'];
 // storm phases: seconds of waiting, seconds of closing, share of the map still safe after, damage per second outside
 const STORM = [[55, 25, .6, 1], [35, 20, .36, 2], [28, 18, .18, 4], [24, 15, .08, 6], [20, 15, 0, 10]];
-const BR_DROP = 22 * 60;
+const BR_DROP = 32 * 60;
 const BR = {
   on: false, via: 'solo', code: 'open', phase: '', mi: '', seed: 0, t: 0, ro: [], nb: 0, lead: true, leaderId: '', people: new Map(),
   cd: 0, cdAt: 0, cdMax: 0, chests: [], open: new Set(), mine: new Set(), zones: [], storm: null, bots: new Map(), bk: [], bkSeq: 0, bkSeen: new Map(),
   dlSeen: new Set(), dl: null, place: 0, spec: null, specT: 0, overT: 0, winner: '', winMe: false, pois: [], segs: BR_BIOMES.slice(), segW: BRW / 5, mapCv: null,
-  note: '', noteT: 0, chan: null, inStorm: false, poiNow: '', mapOpen: false, total: 0, lastAlive: 0, lobbyT: 0, err: ''
+  note: '', noteT: 0, chan: null, inStorm: false, poiNow: '', mapOpen: false, total: 0, lastAlive: 0, lobbyT: 0, err: '', specials: []
 };
 const brOn = () => WORLD.royale && BR.on;
 const brTag = f => !f ? '' : f === G.p ? (NET.me || 'me') : f.botTag || f.peer || '';
@@ -10405,13 +10460,14 @@ function brItems() {
 }
 function brRollTier(rare) { const r = Math.random(); return rare ? (r < .3 ? 2 : r < .78 ? 3 : 4) : (r < .4 ? 0 : r < .7 ? 1 : r < .89 ? 2 : r < .975 ? 3 : 4); }
 function brLoot(rare) {
-  const P = brPool(), k = brRollTier(rare), pool = P[k].length ? P[k] : P[0], out = [[fpick(pool), 1]];
-  const n = rare ? 2 : 1 + (Math.random() < .55 ? 1 : 0);
+  const P = brPool(), k = brRollTier(rare), pool = P[k].length ? P[k] : P[0], out = [];
+  if (rare ? Math.random() < .72 : Math.random() < .14) out.push([fpick(pool), 1]);
+  const n = rare ? 2 : 1;
   for (let i = 0; i < n; i++) {
     const r = Math.random();
     out.push(r < .27 ? ['br_salve', 2] : r < .38 ? ['br_draught', 1] : r < .62 ? ['br_shard', 2] : r < .7 ? ['br_ward', 1] : r < .84 ? [fpick(['shuriken', 'flask', 'smoke']), fpick([2, 3])] : r < .9 ? ['hook', 1] : ['arrow', 15]);
   }
-  if (IT[out[0][0]].ammo && !out.some(o => o[0] === 'arrow')) out.push(['arrow', 20]);
+  if (out[0] && IT[out[0][0]].ammo && !out.some(o => o[0] === 'arrow')) out.push(['arrow', 20]);
   return out;
 }
 
@@ -10449,7 +10505,7 @@ function genRoyale(seed) {
   SPAWN_X = BRW >> 1; SHRINE_X = SHRINE2_X = MINE_X = FORGE_X = GATE_X = SKY_X = BLADE_X = SPIRE_X = REACH_X = RUST_X = -100000; SHRINE_Y = SHRINE2_Y = GATE_Y = MINE_Y = FORGE_Y = SKY_Y = 0;
   BASE_Y = 74; DEEP_Y = 9999; DRIFT_Y = -99; VIL_Y = -999;
   const order = BR_BIOMES.slice(); for (let i = order.length - 1; i > 0; i--) { const j = randi(0, i); const q = order[i]; order[i] = order[j]; order[j] = q; }
-  BR.segs = order; BR.segW = BRW / order.length; BR.chests = []; BR.pois = [];
+  BR.segs = order; BR.segW = BRW / order.length; BR.chests = []; BR.pois = []; BR.specials = [];
   // the shape of the land: rolling hills, steeper in the Reach, flatter in the dunes, cliffs at the edges of the world
   const a1 = rand(TAU), a2 = rand(TAU), a3 = rand(TAU);
   for (let x = 0; x < BRW; x++) {
@@ -10465,7 +10521,7 @@ function genRoyale(seed) {
     SKYL[x] = gy + 3;
   }
   // tunnels under the hills: two or three, each with a chest or two at its far end
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 4; k++) {
     let x = randi(40, BRW - 80), y = heights[x] + 1, dir = rand() < .5 ? -1 : 1, len = randi(50, 90), ent = x;
     for (let s = 0; s < len; s++) {
       const dy = s < 10 ? 1 : s > len - 10 ? -1 : (rand() < .2 ? (rand() < .5 ? -1 : 1) : 0); x += dir; y = clamp(y + dy, heights[clamp(x, 0, BRW - 1)] + 2, BRH - 12);
@@ -10482,8 +10538,14 @@ function genRoyale(seed) {
     const cx = round((i + .5) * BR.segW + rand(-BR.segW * .18, BR.segW * .18)), names = BR_PNAMES[b], name = names.find(n => !used.has(n) && rand() < .6) || names[0]; used.add(name);
     withRng(hh(cx, 2201, SEED) * 4294967296, () => brPOI(b, cx, name));
   });
-  // floating isles with a rare chest each, and a vent beneath to reach them
+  // rare map landmarks give a useful, random one-time boost instead of another chest
   for (let k = 0; k < 3; k++) {
+    const cx = randi(30, BRW - 31), gy = heights[cx], type = k === 0 ? 'cache' : k === 1 ? 'shrine' : 'grove';
+    BR.specials.push({ x: cx, y: gy - 1, type, open: false });
+    reserve(cx - 3, cx + 3, 1);
+  }
+  // floating isles with a rare chest each, and a vent beneath to reach them
+  for (let k = 0; k < 2; k++) {
     const cx = round((k + .5) * BRW / 3 + rand(-50, 50)), cy = heights[cx] - 26 - randi(0, 6), a = 7 + randi(0, 3);
     if (island(cx, cy, a, 4, false)) { for (let y = cy - 4; y < cy; y++) for (let x = cx - 3; x <= cx + 3; x++) if (inW(x, y)) tiles[y * WW + x] = AIR; let gy = cy; while (gy < cy + 6 && !solidAt(cx, gy)) gy++; brChest(cx, gy - 1, true, { high: true }); const vx = cx + (rand() < .5 ? -1 : 1) * (a + 3); vent(vx, cy - 8); }
   }
@@ -10494,10 +10556,15 @@ function genRoyale(seed) {
     if (rand() < ch && abs(heights[x - 1] - gy) <= 1 && abs(heights[x + 1] - gy) <= 1) { brTree(x, gy, b); x += 3; continue; }
     const r = rand(); if (b === 'dunes') { if (r < .05) tiles[(gy - 1) * WW + x] = DEADBUSH; } else if (b === 'ash') { if (r < .04) tiles[(gy - 1) * WW + x] = DEADBUSH; } else if (b !== 'reach' || r < .3) { if (r < .22) tiles[(gy - 1) * WW + x] = TALLGRASS; else if (r < .27) tiles[(gy - 1) * WW + x] = FLOWER; else if (r < .29) tiles[(gy - 1) * WW + x] = BUSH; }
   }
+  // diggable surface deposits: gather rock and flint instead of finding a complete weapon
+  for (let k = 0; k < 18; k++) {
+    const cx = randi(24, BRW - 25), gy = heights[cx];
+    for (let dx = -1; dx <= 1; dx++) { const x = cx + dx; if (tileAt(x, gy - 1) === AIR) tiles[(gy - 1) * WW + x] = rand() < .35 ? GRAVEL : STONE; }
+  }
   // chests out in the open, about one every thirty paces
-  for (let x = 20; x < BRW - 20; x += 22 + randi(0, 16)) { if (RESV[x]) continue; const gy = heights[x]; if (abs(heights[x - 1] - gy) <= 1 && abs(heights[x + 1] - gy) <= 1) brChest(x, gy - 1, rand() < .1); }
+  for (let x = 20; x < BRW - 20; x += 48 + randi(0, 28)) { if (RESV[x]) continue; const gy = heights[x]; if (abs(heights[x - 1] - gy) <= 1 && abs(heights[x + 1] - gy) <= 1) brChest(x, gy - 1, rand() < .08); }
   // a few watch platforms with a chest on top
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 4; k++) {
     const x = randi(30, BRW - 40); if (RESV[x] || RESV[x + 7]) continue; const gy = min(heights[x], heights[x + 7]), py = gy - 6;
     for (let y = py + 1; y <= max(heights[x], heights[x + 7]) - 1; y++) { if (tileAt(x, y) === AIR) tiles[y * WW + x] = BEAM; if (tileAt(x + 7, y) === AIR) tiles[y * WW + x + 7] = BEAM; }
     for (let xx = x; xx <= x + 7; xx++) if (tileAt(xx, py) === AIR) tiles[py * WW + xx] = PLATFORM;
@@ -10514,30 +10581,30 @@ function brPOI(b, cx, name) {
     brFlat(cx - 26, cx + 26, gy); brEase(cx - 26, -1, gy); brEase(cx + 26, 1, gy);
     house(cx - 22, gy, 11, 6, 4, { door: 2, name }); house(cx - 5, gy, 11, 9, 4, { door: 2, floors: 2 }); house(cx + 12, gy, 10, 6, 3, { door: 2 });
     for (let x = cx - 24; x <= cx + 24; x++) for (let y = gy - 4; y < gy; y++) if (tiles[y * WW + x] === DOORC) tiles[y * WW + x] = DOORO;
-    brChest(cx - 17, gy - 1, false); brChest(cx, gy - 1, false); brChest(cx + 1, gy - 5, true); brChest(cx + 16, gy - 1, false);
+    brChest(cx - 17, gy - 1, false); brChest(cx + 16, gy - 1, false);
     dyn(cx - 24, gy - 1, TORCH); dyn(cx + 24, gy - 1, TORCH);
   } else if (b === 'thorn') {
     brFlat(cx - 18, cx + 18, gy); brEase(cx - 18, -1, gy); brEase(cx + 18, 1, gy);
     for (const [ox, w] of [[-14, 7], [5, 8]]) { const x0 = cx + ox; for (let k = 0; k < w; k++) { const hgt = round((1 - abs(k - (w - 1) / 2) / (w / 2)) * 4); for (let y = gy - hgt; y < gy; y++) if (y === gy - hgt || k === 0 || k === w - 1) tiles[y * WW + x0 + k] = THATCH; else walls[y * WW + x0 + k] = W_WATTLE; } }
     dyn(cx - 2, gy - 1, CAMP);
-    brChest(cx - 11, gy - 1, false); brChest(cx + 9, gy - 1, true); brChest(cx + 15, gy - 1, false);
+    brChest(cx - 11, gy - 1, false); brChest(cx + 9, gy - 1, true);
     for (const ox of [-17, 17]) brTree(cx + ox, gy, 'thorn');
   } else if (b === 'dunes') {
     brFlat(cx - 14, cx + 14, gy); brEase(cx - 14, -1, gy); brEase(cx + 14, 1, gy);
-    tower(cx - 4, gy, 9, 20, { ruin: true, name }); brChest(cx, gy - 1, false); brChest(cx - 1, gy - 5, false); brChest(cx + 1, gy - 13, false); brChest(cx, gy - 21, true, { high: true });
+    tower(cx - 4, gy, 9, 20, { ruin: true, name }); brChest(cx - 1, gy - 5, false); brChest(cx, gy - 21, true, { high: true });
     for (const ox of [-12, 10]) for (let y = gy - 3; y < gy; y++) tiles[y * WW + cx + ox] = SANDSTONE;
   } else if (b === 'reach') {
     brFlat(cx - 20, cx + 20, gy); brEase(cx - 20, -1, gy); brEase(cx + 20, 1, gy);
     for (let x = cx - 16; x <= cx + 16; x++) { for (let y = gy - 9; y < gy; y++) walls[y * WW + x] = W_BRICK; tiles[(gy - 9) * WW + x] = abs(x - cx) < 15 ? PLATFORM : BRICK; if (abs(x - cx) % 3 === 0) tiles[(gy - 10) * WW + x] = BRICK; }
     for (const s of [-1, 1]) { for (let y = gy - 9; y < gy - 3; y++) tiles[y * WW + cx + s * 16] = BRICK; for (let y = gy - 13; y < gy - 9; y++) { tiles[y * WW + cx + s * 16] = BRICK; tiles[y * WW + cx + s * 15] = BRICK; } }
     for (let x = cx - 6; x <= cx + 6; x++) tiles[(gy - 5) * WW + x] = PLATFORM;
-    brChest(cx - 10, gy - 1, false); brChest(cx + 10, gy - 1, false); brChest(cx, gy - 6, true); brChest(cx + 12, gy - 10, false, { high: true });
+    brChest(cx - 10, gy - 1, false); brChest(cx, gy - 6, true);
     dyn(cx - 13, gy - 4, TORCH); dyn(cx + 13, gy - 4, TORCH);
   } else {
     brFlat(cx - 18, cx + 18, gy); brEase(cx - 18, -1, gy); brEase(cx + 18, 1, gy);
     for (const [ox, h] of [[-15, 6], [-9, 9], [7, 7], [14, 5]]) for (let y = gy - h; y < gy; y++) { tiles[y * WW + cx + ox] = y < gy - h + 2 && rand() < .5 ? AIR : CINDERBRICK; walls[y * WW + cx + ox + 1] = W_RUIN; }
     for (let x = cx - 9; x <= cx + 7; x++) tiles[(gy - 9) * WW + x] = PLATFORM;
-    vent(cx - 3, gy - 22); brChest(cx - 12, gy - 1, false); brChest(cx + 2, gy - 1, false); brChest(cx - 1, gy - 10, true, { high: true }); brChest(cx + 11, gy - 1, false);
+    vent(cx - 3, gy - 22); brChest(cx - 12, gy - 1, false); brChest(cx - 1, gy - 10, true, { high: true });
   }
   reserve(cx - 28, cx + 28, 2);
 }
@@ -10617,6 +10684,21 @@ function brOpenChest(c, f) {
   if (f === G.p) { loot.forEach(([id, n], k) => spawnDrop(id, n, px - 3, py - 4, (k - (loot.length - 1) / 2) * 1.1, -2.4 - k * .2)); return; }
   if (f && f.br) for (const [id, n] of loot) brBotTake(f, id, n);
 }
+function brNearSpecial(f, r = 18) {
+  let best = null, bd = r;
+  for (const s of BR.specials) if (!s.open) { const d = abs(s.x * T + 4 - (f.x + 3)) + abs(s.y * T - (f.y + f.h)) * .7; if (d < bd) { bd = d; best = s; } }
+  return best;
+}
+function brOpenSpecial(s, f) {
+  if (!s || s.open) return;
+  s.open = true;
+  const px = s.x * T + 4, py = s.y * T;
+  if (s.type === 'cache') { f.ward = min(100, (f.ward || 0) + 35); spawnDrop('br_shard', 2, px, py - 4, 0, -2); BR.note = 'EMBER CACHE  :  +35 ward'; }
+  else if (s.type === 'shrine') { f.brBoost = 240; f.hp = min(f.maxhp, f.hp + 30); BR.note = 'ASHEN SHRINE  :  30 health and a 4-second speed rite'; }
+  else { f.ward = min(100, (f.ward || 0) + 20); if (f === G.p) spawnDrop('br_salve', 2, px, py - 4, 0, -2); BR.note = 'ASH GROVE  :  ward and field medicine'; }
+  BR.noteT = 180;
+  sfx('shrine', 0); burst(px, py, 20, ['#ffd35a', '#ff8a3d', '#fff1a8'], 1.8, 40, { glow: 1 });
+}
 function brBotTake(f, id, n) {
   const it = IT[id]; if (!it) return;
   if (it.type === 'weapon') { if (brTier(id) > brTier(f.wid) || f.wid === 'fists') { f.wid = id; f.arms = f.arms || []; } }
@@ -10646,6 +10728,8 @@ function brEnterMatch(mi, seed, roster, nb) {
   Object.assign(BR, { mapHide: false, mi, seed, t: 0, ro: roster.slice(), nb, phase: 'drop', open: new Set(), mine: new Set(), bots: new Map(), bk: [], bkSeq: 0, bkSeen: new Map(), dlSeen: new Set(), dl: null, place: 0, spec: null, specT: 0, overT: 0, winner: '', winMe: false, chan: null, note: '', noteT: 0, inStorm: false, poiNow: '', mapOpen: false, lastAlive: 0 });
   BR.zones = brZones(seed); BR.storm = brStormAt(0); NET.deathN = 0; NET.kb = ['', 0]; NET.hits = []; NET.shots = []; NET.seen.clear();
   inv = new Array(INV_N).fill(null); G.sel = 0;
+  const brKit = [['stick', 12], ['fiber', 8], ['flint', 6], ['rock', 10], ['arrow', 12], ['twine', 5]];
+  brKit.forEach(([id, n], i) => inv[i] = { id, n });
   G.p = newPlayer(); Object.assign(G.p, { name: G.nick, brIn: true, ward: 0, onBarge: true, noHit: true, team: 'me' }); G.fighters = [G.p]; G.npcs = []; G.enemies = [];
   for (const f of NET.peers.values()) { f.gone = true; } NET.peers.clear();
   // echoes fill the empty places; the leader runs them, everyone else sees them through the leader
@@ -10670,6 +10754,7 @@ function brTick() {
   // my Waker and my echoes take storm damage; everyone else's computer handles theirs
   if (BR.t % 30 === 0 && BR.phase !== 'over') for (const f of G.fighters) if (f.brIn && !f.remote && !f.dead && !f.onBarge && brOut(f)) brStormHurt(f);
   const p = G.p; BR.inStorm = !p.dead && !p.onBarge && brOut(p);
+  if (p.brBoost > 0) p.brBoost--;
   // the named place you stand in
   if (!p.dead && !p.onBarge && G.time % 20 === 0) { const q = BR.pois.find(q => abs(q.x * T - p.x) < 26 * T); const n = q ? q.name : ''; if (n && n !== BR.poiNow) { G.note = { text: n, t: 0 }; } BR.poiNow = n; }
   // spectating after you fall
@@ -10714,7 +10799,7 @@ function brInput(p, I) {
   const it = heldItem();
   if (it && it.type === 'brheal' && !UI.open) { if (I.lp && !p.brUse) brStartUse(p, it.id); I.lp = I.l = false; }
   if (!UI.open && !G.dialog) {
-    if (pressed.KeyF) { const c = brNearChest(p); if (c) brOpenChest(c, p); }
+    if (pressed.KeyF) { const c = brNearChest(p); if (c) brOpenChest(c, p); else { const s = brNearSpecial(p); if (s) brOpenSpecial(s, p); } }
     if (pressed.KeyH) brQuickUse(p);
     if (pressed.KeyT) cycleArm(p);
   }
@@ -11056,7 +11141,7 @@ function drawBrForm(c) {
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
   drawText(c, 'MATCH', fx, y + 70, '#b9bdd0'); field(c, fx + 46, y + 66, fw - 46, 'brcode', 'open  (or a private code)');
-  const L = ['Ride the Ember Barge over the island and leap off (SPACE).', 'Open chests (F) for weapons, salves and wards. The ashfall', 'storm closes in from both sides: last one standing wins.', 'Echoes fill any empty places, so a match is never empty.'];
+  const L = ['Ride the Ember Barge over the enlarged island and leap off (SPACE).', 'Gather materials and craft, dig deposits, or awaken rare landmarks.', 'Chests are scarce and weapons are uncommon. The ashfall', 'closes in from both sides: last one standing wins.'];
   L.forEach((l, i) => drawText(c, l, fx, y + 92 + i * 10, '#d8d4e6'));
   const go = (fn) => { UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.nick = nick; G.skin = FORM.skin | 0; accountSaveProfile(); G.state = 'loading'; G.loadMsg = 'Raising the island...'; setTimeout(fn, 30); sfx('quest', 0); };
   let by = y + 140;
@@ -11116,6 +11201,12 @@ function brDrawBarge(w, b, al) {
 }
 function brWorld(w, al, cx, cy) {
   if (!brOn()) return; const q = STN_SPR[CHEST], vx0 = cx - 20, vx1 = cx + VS.vw + 20;
+  for (const s of BR.specials) {
+    const px = s.x * T, py = s.y * T;
+    if (px < vx0 || px > vx1 || py < cy - 20 || py > cy + VS.vh + 20) continue;
+    w.fillStyle = s.open ? '#4a4460' : s.type === 'shrine' ? '#ff8a3d' : s.type === 'cache' ? '#ffd35a' : '#7ddc6f';
+    w.fillRect(px - 2, py - 7, 12, 8); w.fillStyle = '#fff1a8'; w.fillRect(px + 2, py - 10, 4, 3);
+  }
   for (const ch of BR.chests) {
     const px = ch.x * T, py = ch.y * T; if (px < vx0 || px > vx1 || py < cy - 20 || py > cy + VS.vh + 20) continue;
     if (ch.open) { w.globalAlpha = .55; w.drawImage(q.img, px + q.ox, py + q.oy + 1); w.globalAlpha = 1; w.fillStyle = '#2a1e16'; w.fillRect(px + q.ox + 1, py + q.oy + 1, q.img.width - 2, 2); }
@@ -11142,6 +11233,7 @@ function brOverlay(ctx, al, cx, cy) {
   }
   const p = G.p;
   if (!p.dead && !p.onBarge) { const ch = brNearChest(p, 22); if (ch) { const s = '[F] OPEN', X = ch.x * T + 4, Y = ch.y * T - 10; textO(ctx, s, round(X - textW(s) / 2), Y, ch.rare ? '#ffd35a' : '#fff'); } }
+  if (!p.dead && !p.onBarge) { const sp = brNearSpecial(p, 22); if (sp) { const s = '[F] AWAKEN', X = sp.x * T + 4, Y = sp.y * T - 14; textO(ctx, s, round(X - textW(s) / 2), Y, '#ffd35a'); } }
   for (const f of G.fighters) { if (f === p || f.dead || f.onBarge || !f.brIn || (f.ward || 0) <= 0 || f.x < x0 || f.x > x1) continue; const X = round(lerp(f.px, f.x, al)) - 3, Y = round(lerp(f.py, f.y, al)) - 4; ctx.fillStyle = INK; ctx.fillRect(X - 1, Y - 1, 14, 3); ctx.fillStyle = '#5aa8ff'; ctx.fillRect(X, Y, round(12 * f.ward / 100), 1); }
 }
 function brScreen(ctx, W, H) {
@@ -11196,6 +11288,7 @@ function brMap(c) {
   if (z) { c.fillStyle = 'rgba(150,60,170,.45)'; c.fillRect(x, y, round(z.L * s), h); c.fillRect(x + round(z.R * s), y, w - round(z.R * s), h); c.fillStyle = '#ffffff'; c.fillRect(x + round(z.nL * s), y, 1, h); c.fillRect(x + round(z.nR * s), y, 1, h); }
   for (const q of BR.pois) { const X = x + round(q.x * T * s), Y = y + round(heights[q.x] * T * s - oy) - 14; textC(c, q.name, X, max(y + 2, Y), '#fff1a8', 1, textO); }
   for (const ch of BR.chests) if (!ch.open && !ch.cave) { c.fillStyle = ch.rare ? '#ffd35a' : 'rgba(255,200,120,.7)'; c.fillRect(x + round(ch.x * T * s), y + round(ch.y * T * s - oy), 1, 1); }
+  for (const sp of BR.specials) if (!sp.open) { c.fillStyle = sp.type === 'shrine' ? '#ff8a3d' : sp.type === 'cache' ? '#ffd35a' : '#7ddc6f'; c.fillRect(x + round(sp.x * T * s), y + round(sp.y * T * s - oy), 2, 2); }
   const p = G.p, me = p.onBarge ? brBarge() : p, my = clamp(round((me.y + 10) * s - oy), 2, h - 2); c.fillStyle = '#ffd35a'; c.fillRect(x + round((me.x + 3) * s) - 2, y + my - 2, 5, 5); c.fillStyle = INK; c.fillRect(x + round((me.x + 3) * s), y + my, 1, 1);
   if (p.onBarge) textC(c, 'SPACE to leap here', x + round((me.x + 3) * s), y + my + 6, '#ffd35a', 1, textO);
 }
@@ -11267,15 +11360,16 @@ function wireDC(P, dc) {
 }
 // key: a message that only says where something is now; a newer one replaces it if it hasn't left yet
 function sendTo(P, m, key) {
-  if (!P) return; const dc = dcOpen(P); if (!dc && !P.relay) return;
+  if (!P) return false; const dc = dcOpen(P); if (!dc && !P.relay) return false;
   const s = typeof m === 'string' ? m : JSON.stringify(m), out = [];
   if (s.length > 15000) { const id = ++COOP.pid, n = ceil(s.length / 15000); for (let k = 0; k < n; k++) out.push(JSON.stringify({ t: '_p', id, k, n, s: s.slice(k * 15000, (k + 1) * 15000) })); } else out.push(s);
   if (dc) {
     // the direct line came up while the relay was busy: wait until the relay is clear, so nothing arrives out of turn
-    if (P.relay && (P.rq.length || P.rw.size || P.rbusy || (P.hold && P.hold.length))) { const H = P.hold || (P.hold = []); for (const x of out) H.push(x); if (H.length > 3000) rlyHoldFlush(P, true); return; }
-    try { for (const x of out) P.dc.send(x); return; } catch (e) { if (!P.relay) return; }
+    if (P.relay && (P.rq.length || P.rw.size || P.rbusy || (P.hold && P.hold.length))) { const H = P.hold || (P.hold = []); for (const x of out) H.push(x); if (H.length > 3000) rlyHoldFlush(P, true); return true; }
+    try { for (const x of out) P.dc.send(x); return true; } catch (e) { if (!P.relay) return false; }
   }
   for (const x of out) rlyQueue(P, x, out.length === 1 ? key : '');
+  return true;
 }
 function sendAll(m, except, key) { const s = JSON.stringify(m); for (const P of COOP.peers.values()) if (P !== except && P.ok && !P.ghostPeer) sendTo(P, s, key); }
 function onRaw(P, data) {
@@ -11450,8 +11544,8 @@ function guestLegacyKey() { return 'ew2.guest.' + WORLD.id; }
 function guestKey() { return ACCOUNT.active ? profileKey('guest.' + WORLD.id) : guestLegacyKey(); }
 function guestSave() {
   if (!netGuest() || !G.p || !WORLD.id) return;
-  const o = { v: 1, inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '',
-    food: r1(G.food), mast: G.mast || {}, fight: fightSave(), pairs: [...(G.pairsKnown || [])], known: [...G.known], used: [...G.movesUsed], flags: G.flags || {}, quality: G.quality || {}, hp: round(G.p.hp), skin: G.skin | 0, beasts: G.beasts || {}, kills: G.kills | 0, journal: G.journal || [], boons: trinkSave() };
+  const o = { v: 1, inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '', sel: G.sel | 0,
+    food: r1(G.food), mast: G.mast || {}, fight: fightSave(), pairs: [...(G.pairsKnown || [])], known: [...G.known], used: [...G.movesUsed], flags: G.flags || {}, quality: G.quality || {}, hp: round(G.p.hp), skin: G.skin | 0, hat: G.hat | 0, beasts: G.beasts || {}, kills: G.kills | 0, journal: G.journal || [], boons: trinkSave() };
   LS.set(guestKey(), JSON.stringify(o));
 }
 function guestLoad() {
@@ -11475,6 +11569,9 @@ function guestLoad() {
   if (Array.isArray(o.gear)) GEAR_SLOTS.forEach((s, k) => { const id = o.gear[k]; if (IT[id] && IT[id].type === 'armor' && IT[id].slot === s) G.gear[s] = { id, n: 1 }; });
   if (IT[o.off] && IT[o.off].type === 'weapon') G.gear.off = { id: o.off, n: 1 };
   trinkLoad(o.boons);
+  G.skin = clamp(o.skin | 0, 0, SKINS.length - 1);
+  G.hat = clamp(o.hat | 0, 0, 7);
+  G.sel = clamp(o.sel | 0, 0, max(0, INV_N - 1));
   G.food = clamp(num(o.food, 100), 0, 100); if (o.mast && typeof o.mast === 'object') for (const k in o.mast) if (STYLES[k] && isFinite(o.mast[k])) G.mast[k] = +o.mast[k];
   G.pairsKnown = new Set(Array.isArray(o.pairs) ? o.pairs.filter(isStyleId) : []); G.known = new Set(Array.isArray(o.known) ? o.known : []); G.movesUsed = new Set(Array.isArray(o.used) ? o.used : []);
   G.flags = o.flags && typeof o.flags === 'object' ? o.flags : {}; G.quality = o.quality && typeof o.quality === 'object' ? o.quality : {}; G.beasts = o.beasts && typeof o.beasts === 'object' ? o.beasts : {}; G.kills = o.kills | 0;
@@ -11625,24 +11722,41 @@ function eSer(e) {
   }
   return o;
 }
-function delta(cur, last) { const d = {}; for (const k in cur) { const a = cur[k], b = last[k]; if (a === b) continue; if (a && typeof a === 'object' && b && JSON.stringify(a) === JSON.stringify(b)) continue; d[k] = a; } return d; }
+function delta(cur, last) {
+  const d = {};
+  for (const k in cur) { const a = cur[k], b = last[k]; if (a === b) continue; if (a && typeof a === 'object' && b && JSON.stringify(a) === JSON.stringify(b)) continue; d[k] = a; }
+  for (const k in last) if (!(k in cur)) d[k] = null;
+  return d;
+}
 function sendFoes(P) {
-  const f = P.f; if (!f) return; const seen = P.seen, live = new Set(), e1 = [];
+  const f = P.f; if (!f) return; const seen = P.seen, live = new Set(), e1 = [], curSeen = new Map();
   for (const e of G.enemies) {
     if (e.dead || e.type === 'dummy' || abs(e.x - f.x) > FOE_RX || abs(e.y - f.y) > FOE_RY) continue; if (!e.nid) e.nid = COOP.nid++; live.add(e.nid);
-    const cur = eSer(e), last = seen.get(e.nid); if (!last) e1.push([e.nid, cur, 1]); else { const d = delta(cur, last); if (Object.keys(d).length) e1.push([e.nid, d, 0]); } seen.set(e.nid, cur);
+    const cur = eSer(e), last = seen.get(e.nid); if (!last) e1.push([e.nid, cur, 1]); else { const d = delta(cur, last); if (Object.keys(d).length) e1.push([e.nid, d, 0]); }
+    curSeen.set(e.nid, cur);
   }
-  const gone = []; for (const id of seen.keys()) if (!live.has(id)) { gone.push(id); seen.delete(id); }
+  const gone = []; for (const id of seen.keys()) if (!live.has(id)) gone.push(id);
   const hs = [], hnow = new Set();
   for (const h of G.fighters) { if (!h.hollow || h.remote || h.gone || abs(h.x - f.x) > FOE_RX || abs(h.y - f.y) > FOE_RY) continue; if (!h.nid) h.nid = COOP.nid++; hnow.add(h.nid); const s = fighterState(h); s.n = h.name; s.sk = h.skin; hs.push([h.nid, s]); }
   const hx = []; for (const id of P.hseen) if (!hnow.has(id)) { hx.push(id); P.hseen.delete(id); } for (const id of hnow) P.hseen.add(id);
-  if (e1.length || gone.length || hs.length || hx.length) sendTo(P, { t: 'foes', e: e1, x: gone, h: hs, hx });
+  if (e1.length || gone.length || hs.length || hx.length) {
+    if (sendTo(P, { t: 'foes', e: e1, x: gone, h: hs, hx })) {
+      for (const [id, cur] of curSeen) seen.set(id, cur);
+      for (const id of gone) seen.delete(id);
+    }
+  }
 }
 function onFoes(m) {
   for (const q of Array.isArray(m.e) ? m.e : []) {
     const id = q[0], d = q[1]; if (!d || typeof d !== 'object') continue; let g = COOP.ghosts.get(id);
     if (!g) { if (!q[2] || typeof d.type !== 'string') continue; g = { ghost: true, nid: id, x: num(d.x), y: num(d.y), px: num(d.x), py: num(d.y), vx: 0, vy: 0, w: 8, h: 8, hp: 1, maxhp: 1, flash: 0, t: 0, dead: false }; COOP.ghosts.set(id, g); G.enemies.push(g); }
-    for (const k in d) { let v = d[k]; if (k === 'x' || k === 'y') continue; if (plainObj(v)) { if (v.$e !== undefined) { const r = COOP.ghosts.get(v.$e); if (!r) (g._ref || (g._ref = {}))[k] = v.$e; v = r || null; } else v = Object.assign({}, v); } g[k] = v; }
+    for (const k in d) {
+      let v = d[k];
+      if (k === 'x' || k === 'y') continue;
+      if (v === null) { delete g[k]; continue; }
+      if (plainObj(v)) { if (v.$e !== undefined) { const r = COOP.ghosts.get(v.$e); if (!r) (g._ref || (g._ref = {}))[k] = v.$e; v = r || null; } else v = Object.assign({}, v); }
+      g[k] = v;
+    }
     if (d.x !== undefined) g.ax = num(d.x); if (d.y !== undefined) g.ay = num(d.y); g.heardT = 0; g.dead = false;
     if (g.boss && !G.boss) G.boss = g;
   }
@@ -12717,7 +12831,7 @@ function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed
 function snapshotWorld() {
   const p = G.p;
   return Object.assign(worldMeta(), {
-    v: 6, endless: 1, gen: 2, legacy: WORLD.legacy || {}, lairs: [...(G.lairs || [])], bless: G.bless && G.bless.t > 0 ? [G.bless.k, round(G.bless.t)] : 0, blessUsed: blessKeep(), dim: DIM, dims: Object.assign({}, DSTASH), echoes: [...(G.echoes || [])], beasts: G.beasts || {}, mods: [encodeMods(), encodeChips(), encodeIdx(PLACED), encodePairs(WMODS), encodeSeen()].join('|'), inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0),
+    v: 6, endless: 1, gen: 2, legacy: WORLD.legacy || {}, lairs: [...(G.lairs || [])], bless: G.bless && G.bless.t > 0 ? [G.bless.k, round(G.bless.t)] : 0, blessUsed: blessKeep(), dim: DIM, dims: Object.assign({}, DSTASH), echoes: [...(G.echoes || [])], beasts: G.beasts || {}, mods: [encodeMods(), encodeChips(), encodeIdx(PLACED), encodePairs(WMODS), encodeSeen()].join('|'), inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0), sel: G.sel | 0,
     food: r1(G.food), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '', mast: G.mast || {}, fight: fightSave(), boons: trinkSave(), pairs: [...(G.pairsKnown || [])], quality: G.quality || {}, reqs: G.reqs || [], stn: encodeStn(), wake: G.respawn ? 1 : 0, p: { x: r1(p.x), y: r1(p.y), hp: max(1, round(p.hp)), arm: p.arm || '' }, flags: G.flags, journal: G.journal,
     known: [...G.known], used: [...G.movesUsed], clock: r2(G.clock), deaths: G.deaths || 0, kills: G.kills || 0,
     leads: [...G.leads], pin: G.pin || '', found: [...G.found], links: [...G.linksKnown], respawn: G.respawn ? [G.respawn.x, G.respawn.y] : 0
@@ -12831,6 +12945,7 @@ function startWorld(data) {
       G.food = clamp(num(data.food, 100), 0, 100); G.quality = data.quality && typeof data.quality === 'object' ? data.quality : {}; G.reqs = Array.isArray(data.reqs) ? data.reqs.filter(r => r && Array.isArray(r.need) && IT[r.need[0]] && Array.isArray(r.give) && IT[r.give[0]]) : null;
       // a world from before the lands were dealt at random regrows, and you wake in it with nothing
       inv = new Array(PACK_MAX).fill(null); if (!old) (Array.isArray(data.inv) ? data.inv : []).forEach((s, i) => { if (!Array.isArray(s)) return; const id = LEGACY[s[0]] || s[0]; if (i < INV_N && IT[id]) inv[i] = { id, n: clamp(s[1] | 0, 1, IT[id].stack) }; });
+      G.sel = clamp(data.sel | 0, 0, max(0, INV_N - 1));
       G.flags = data.flags && typeof data.flags === 'object' ? data.flags : {}; G.journal = Array.isArray(data.journal) ? data.journal.filter(j => JOURNAL[j]) : ['waking', 'forge'];
       G.echoes = new Set((Array.isArray(data.echoes) ? data.echoes : []).filter(n => isFinite(n) && echoInfo(n))); G.beasts = data.beasts && typeof data.beasts === 'object' ? data.beasts : {};
       G.lairs = new Set((Array.isArray(data.lairs) ? data.lairs : []).filter(s => typeof s === 'string')); G.bless = Array.isArray(data.bless) && BLESS[data.bless[0]] ? { k: data.bless[0], t: clamp(num(data.bless[1]), 0, BLESS_T) } : null;

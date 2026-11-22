@@ -85,7 +85,7 @@ function buildArmor() {
 
 // ---------------- what you are wearing, summed up ----------------
 let GEAR_C = null;
-function gearKey() { const W = G.p && heldOf(G.p); return GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : '').join(',') + '|' + (W && W.type === 'weapon' ? W.id || W.name : '') + '|' + (G.p && G.p.mastery ? 1 : 0); }
+function gearKey() { const W = G.p && heldOf(G.p); const off = G.gear && G.gear.off ? G.gear.off.id : ''; return GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : '').join(',') + '|' + (W && W.type === 'weapon' ? W.id || W.name : '') + '|' + off + '|' + (G.p && G.p.mastery ? 1 : 0); }
 function gearStats() {
   const key = gearKey(); if (GEAR_C && GEAR_C.key === key) return GEAR_C;
   const g = { key, prot: 0, wt: 0, res: {}, mats: {}, tags: new Set(), mine: 1, poise: 1, shot: 1 };
@@ -98,7 +98,9 @@ function gearStats() {
   for (const m in g.mats) if (g.mats[m] === 4 && AMAT[m]) { g.set = m; g.tags.add(AMAT[m].gift); for (const k in AMAT[m].res || {}) g.res[k] = AMAT[m].res[k]; }
   if (g.tags.has('bright')) { g.tags.add('light'); g.mine *= 1.1; }
   if (g.res.heat) g.tags.add('heat');
-  const W = G.p && heldOf(G.p), ww = W && W.type === 'weapon' && !W.fist ? (W.wtype && WTYPE[W.wtype] ? WTYPE[W.wtype].sz : SET_WT[W.set] || 2) : 0;
+  const W = G.p && heldOf(G.p), heldWeight = W && W.type === 'weapon' && !W.fist ? (W.wt !== undefined ? W.wt : W.wtype && WTYPE[W.wtype] ? WTYPE[W.wtype].sz : SET_WT[W.set] || 2) : 0;
+  const off = G.gear && G.gear.off && IT[G.gear.off.id], offWeight = off && off.type === 'weapon' && !off.fist ? (off.wt !== undefined ? off.wt : SET_WT[off.set] || 2) : 0;
+  const ww = heldWeight + offWeight;
   g.load = g.wt + ww; g.ci = g.load <= WCLASS_AT[0] ? 0 : g.load <= WCLASS_AT[1] ? 1 : g.load <= WCLASS_AT[2] ? 2 : 3; g.cls = WCLASS[g.ci];
   g.prot = round(g.prot); g.dr = g.prot / (g.prot + 60);
   return GEAR_C = g;
@@ -106,6 +108,7 @@ function gearStats() {
 const gearOn = () => !WORLD.arena && !!G.p;
 function gearMul(kind) {
   if (!gearOn()) return blessMul(kind); const g = gearStats(); let v = (g.cls[kind] !== undefined ? g.cls[kind] : 1) * blessMul(kind);
+  const c = carryStats(); if (c.cls[kind] !== undefined) v *= c.cls[kind];
   if (kind === 'mine') v *= g.mine;
   if (kind === 'poise') v *= g.poise * (g.tags.has('bulwark') ? .5 : 1);
   if (kind === 'walk' && g.tags.has('swift')) v *= 1.08;
@@ -171,7 +174,7 @@ function wearAt(i) { const s = inv[i]; if (!s) return; const it = IT[s.id]; if (
 function drawGearPanel(c, x, y) {
   if (!SLOT_G) { SLOT_G = {}; for (const k in SLOT_GLYPH) SLOT_G[k] = spr(SLOT_GLYPH[k], { a: '#3d3a52' }); }
   const g = gearStats(); let tip = null;
-  panel(c, x - 5, y - 16, 199, 76, 'WORN'); hit(x - 5, y - 16, 199, 76, () => { });
+  panel(c, x - 5, y - 16, 199, 96, 'WORN'); hit(x - 5, y - 16, 199, 96, () => { });
   GEAR_SLOTS.forEach((s, k) => {
     const sx = x + k * 19, sy = y, hov = inR(sx, sy, 18, 18), cur = G.gear[s], h = UI.held, fits = h && IT[h.id] && IT[h.id].type === 'armor' && IT[h.id].slot === s;
     slotBox(c, sx, sy, fits, hov); if (cur) drawStack(c, cur, sx, sy); else c.drawImage(SLOT_G[s], sx + 6, sy + 7);
@@ -181,9 +184,10 @@ function drawGearPanel(c, x, y) {
   { const sx = x + 80, hov = inR(sx, y, 18, 18), cur = G.gear.off, h = UI.held, fits = h && IT[h.id] && IT[h.id].type === 'weapon'; slotBox(c, sx, y, fits, hov); if (cur) drawStack(c, cur, sx, y); else drawText(c, 'OFF', sx + 3, y + 6, '#3d3a52'); if (hov && cur && !h) tip = itemTip(IT[cur.id]); else if (hov && !cur && !h) tip = [['OFF HAND', '#ffd35a'], ['A second weapon. [X] swaps it into your hand. Swap right after a style lands for a pair finisher.', '#b9bdd0']]; hit(sx, y, 18, 18, () => gearSlotClick('off')); }
   const tx = x + 104; textS(c, `PROT ${g.prot}`, tx, y - 1, '#e8edf2'); textS(c, `-${round(g.dr * 100)}%`, tx + 50, y - 1, '#8b8fa3');
   textS(c, `LOAD ${round(g.load * 10) / 10}`, tx, y + 8, '#e8edf2'); textS(c, g.cls.n, tx + 50, y + 8, g.cls.col);
-  if (g.set) textS(c, AMAT[g.set].set.split(':')[0].toUpperCase() + ' SET', tx, y + 17, '#ffd35a');
-  drawText(c, wrapText(g.cls.d, 188)[0] || '', x - 2, y + 21, '#6a6485');
-  { const t2 = drawTrinketRow(c, x, y + 31); if (t2) tip = t2; }
+  const cary = carryStats();   textS(c, `CARRY ${cary.wt}`, tx, y + 17, '#e8edf2'); textS(c, cary.cls.n, tx + 50, y + 17, cary.cls.col);
+  if (g.set) textS(c, AMAT[g.set].set.split(':')[0].toUpperCase() + ' SET', tx, y + 26, '#ffd35a');
+  drawText(c, wrapText(g.cls.d + '  ' + cary.cls.d, 188)[0] || '', x - 2, y + 35, '#6a6485');
+  { const t2 = drawTrinketRow(c, x, y + 44); if (t2) tip = t2; }
   return tip;
 }
 function drawGearHud(c) {

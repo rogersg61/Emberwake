@@ -49,6 +49,12 @@ The **workshops** turn raw things into materials: the kiln (brick, glass, charco
 
 Each kind of weapon (blades, pikes, fangs, mauls, bows, chains, fists) has its own **fighting style**, and you **learn it by using it**. A new weapon family starts at **BASICS** (the plain combo, the heavy blow, the air combo and the counter). Keep fighting with it and it grows to **FOOTWORK** (sweeps, rising strikes, dives), then **FLOW** and **MASTERY** (dashes, charged and aimed heavies). The forms page (**C**) shows what each step teaches.
 
+**Timing matters.** Every attack has a wind-up, active strike and recovery. Repeated clicks are buffered only briefly, and a new attack is strongest when you begin it inside the recovery sweet spot. Attacks started too soon deal less damage, while a rare perfect-timed follow-up may land as an exceptional critical hit. This is a light timing bonus: armour, weapons and character style still matter most.
+
+**Carry weight.** Weapons, armour, blocks and pack items each have weight. The worn panel shows both armour load and the weight in your pack. Light and medium loads have no movement penalty; heavy and overloaded packs make movement, jumps, dodges and stamina slower. Dropping items relieves carry weight immediately, and larger tools or blocks weigh more than small materials.
+
+**Arrows.** Bows consume arrows from the pack. Craft arrows from sticks and flint, bone or other arrow materials, then equip a bow; a bow cannot fire indefinitely without ammunition.
+
 **Every attack sets up the next.** A sweep knocks a foe **DOWN**: hit a downed foe with a heavy blow or from above and it **CRUSHES**. Launch a foe and your air blows **JUGGLE** it, then a dive **SPIKES** it. Lunges and dashes leave a foe **OPEN** for a heavy blow that **BREAKS** it. Thrusts **SKEWER** a pinned, hooked or reeled foe, and a run of light blows builds **RHYTHM** for a heavier finish. Each family leans on some of these more than others.
 
 **A perfect dodge** (dodge just as a blow lands) opens a **counter**: attack straight away for a riposte, aim up for a rising counter, hold **S** for a sweeping one, or use the heavy button for a reversal; in the air, a diving one.

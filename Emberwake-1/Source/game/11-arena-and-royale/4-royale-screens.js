@@ -9,7 +9,7 @@ function drawBrForm(c) {
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
   drawText(c, 'MATCH', fx, y + 70, '#b9bdd0'); field(c, fx + 46, y + 66, fw - 46, 'brcode', 'open  (or a private code)');
-  const L = ['Ride the Ember Barge over the island and leap off (SPACE).', 'Open chests (F) for weapons, salves and wards. The ashfall', 'storm closes in from both sides: last one standing wins.', 'Echoes fill any empty places, so a match is never empty.'];
+  const L = ['Ride the Ember Barge over the enlarged island and leap off (SPACE).', 'Gather materials and craft, dig deposits, or awaken rare landmarks.', 'Chests are scarce and weapons are uncommon. The ashfall', 'closes in from both sides: last one standing wins.'];
   L.forEach((l, i) => drawText(c, l, fx, y + 92 + i * 10, '#d8d4e6'));
   const go = (fn) => { UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.nick = nick; G.skin = FORM.skin | 0; accountSaveProfile(); G.state = 'loading'; G.loadMsg = 'Raising the island...'; setTimeout(fn, 30); sfx('quest', 0); };
   let by = y + 140;
@@ -69,6 +69,12 @@ function brDrawBarge(w, b, al) {
 }
 function brWorld(w, al, cx, cy) {
   if (!brOn()) return; const q = STN_SPR[CHEST], vx0 = cx - 20, vx1 = cx + VS.vw + 20;
+  for (const s of BR.specials) {
+    const px = s.x * T, py = s.y * T;
+    if (px < vx0 || px > vx1 || py < cy - 20 || py > cy + VS.vh + 20) continue;
+    w.fillStyle = s.open ? '#4a4460' : s.type === 'shrine' ? '#ff8a3d' : s.type === 'cache' ? '#ffd35a' : '#7ddc6f';
+    w.fillRect(px - 2, py - 7, 12, 8); w.fillStyle = '#fff1a8'; w.fillRect(px + 2, py - 10, 4, 3);
+  }
   for (const ch of BR.chests) {
     const px = ch.x * T, py = ch.y * T; if (px < vx0 || px > vx1 || py < cy - 20 || py > cy + VS.vh + 20) continue;
     if (ch.open) { w.globalAlpha = .55; w.drawImage(q.img, px + q.ox, py + q.oy + 1); w.globalAlpha = 1; w.fillStyle = '#2a1e16'; w.fillRect(px + q.ox + 1, py + q.oy + 1, q.img.width - 2, 2); }
@@ -95,6 +101,7 @@ function brOverlay(ctx, al, cx, cy) {
   }
   const p = G.p;
   if (!p.dead && !p.onBarge) { const ch = brNearChest(p, 22); if (ch) { const s = '[F] OPEN', X = ch.x * T + 4, Y = ch.y * T - 10; textO(ctx, s, round(X - textW(s) / 2), Y, ch.rare ? '#ffd35a' : '#fff'); } }
+  if (!p.dead && !p.onBarge) { const sp = brNearSpecial(p, 22); if (sp) { const s = '[F] AWAKEN', X = sp.x * T + 4, Y = sp.y * T - 14; textO(ctx, s, round(X - textW(s) / 2), Y, '#ffd35a'); } }
   for (const f of G.fighters) { if (f === p || f.dead || f.onBarge || !f.brIn || (f.ward || 0) <= 0 || f.x < x0 || f.x > x1) continue; const X = round(lerp(f.px, f.x, al)) - 3, Y = round(lerp(f.py, f.y, al)) - 4; ctx.fillStyle = INK; ctx.fillRect(X - 1, Y - 1, 14, 3); ctx.fillStyle = '#5aa8ff'; ctx.fillRect(X, Y, round(12 * f.ward / 100), 1); }
 }
 function brScreen(ctx, W, H) {
@@ -149,6 +156,7 @@ function brMap(c) {
   if (z) { c.fillStyle = 'rgba(150,60,170,.45)'; c.fillRect(x, y, round(z.L * s), h); c.fillRect(x + round(z.R * s), y, w - round(z.R * s), h); c.fillStyle = '#ffffff'; c.fillRect(x + round(z.nL * s), y, 1, h); c.fillRect(x + round(z.nR * s), y, 1, h); }
   for (const q of BR.pois) { const X = x + round(q.x * T * s), Y = y + round(heights[q.x] * T * s - oy) - 14; textC(c, q.name, X, max(y + 2, Y), '#fff1a8', 1, textO); }
   for (const ch of BR.chests) if (!ch.open && !ch.cave) { c.fillStyle = ch.rare ? '#ffd35a' : 'rgba(255,200,120,.7)'; c.fillRect(x + round(ch.x * T * s), y + round(ch.y * T * s - oy), 1, 1); }
+  for (const sp of BR.specials) if (!sp.open) { c.fillStyle = sp.type === 'shrine' ? '#ff8a3d' : sp.type === 'cache' ? '#ffd35a' : '#7ddc6f'; c.fillRect(x + round(sp.x * T * s), y + round(sp.y * T * s - oy), 2, 2); }
   const p = G.p, me = p.onBarge ? brBarge() : p, my = clamp(round((me.y + 10) * s - oy), 2, h - 2); c.fillStyle = '#ffd35a'; c.fillRect(x + round((me.x + 3) * s) - 2, y + my - 2, 5, 5); c.fillStyle = INK; c.fillRect(x + round((me.x + 3) * s), y + my, 1, 1);
   if (p.onBarge) textC(c, 'SPACE to leap here', x + round((me.x + 3) * s), y + my + 6, '#ffd35a', 1, textO);
 }
