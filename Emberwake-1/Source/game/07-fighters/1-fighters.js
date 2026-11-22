@@ -20,7 +20,7 @@ function newFighter(x, y, o) {
     fighter: true, x, y, px: x, py: y, w: 6, h: 20, vx: 0, vy: 0, face: 1, onGround: false, canStep: true, stepVis: 0, hp: 100, maxhp: 100, stam: 100, maxstam: 100, stamDelay: 0,
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
-    placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
+    placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
     kills: 0, deaths: 0, foes: [], atkN: 0
   };
   Object.assign(f, o);
@@ -28,7 +28,7 @@ function newFighter(x, y, o) {
   return f;
 }
 function newPlayer() {
-  const sx = SPOTS.camp ? SPOTS.camp.x - 6 : SPAWN_X, sy = SPOTS.camp ? SPOTS.camp.y : heights[SPAWN_X]; const p = newFighter(sx * T + 1, (sy - 3) * T, { isPlayer: true, skin: G.skin || 0, name: G.nick || 'You' });
+  const sx = SPOTS.camp ? SPOTS.camp.x - 6 : SPAWN_X, sy = SPOTS.camp ? SPOTS.camp.y : heights[SPAWN_X]; const p = newFighter(sx * T + 1, (sy - 3) * T, { isPlayer: true, skin: G.skin || 0, hat: G.hat || 0, name: G.nick || 'You' });
   while (boxHits(p.x, p.y, p.w, p.h)) p.y -= T; p.py = p.y; return p;
 }
 function reviveFighter(f, x, y) {
@@ -286,6 +286,11 @@ function armDraw(x, sx, sy, ang, ext, col, hand) {
   seg(x, sx, sy, ex, ey, 2, col); seg(x, ex, ey, hx, hy, 2, col); x.fillStyle = hand; x.fillRect(round(hx - 1), round(hy - 1), 2, 2);
 }
 function basePose() { return { l1a: .08, l1b: .08, l2a: -.08, l2b: -.08, lean: 0, bob: 0, armA: 1.15, armExt: .8, armB: 1.75, armBext: .85, wAng: -.6, wOff: 0, rot: 0, head: 0, crouch: 0, tuck: 0, kick: 0, stance: 0 }; }
+function drawHat(x, hat) {
+  if (hat === 1) { x.fillStyle = '#7a3222'; x.fillRect(-4, -11, 8, 2); x.fillStyle = '#ff8a3d'; x.fillRect(-3, -14, 6, 3); x.fillStyle = '#ffd35a'; x.fillRect(-1, -16, 2, 2); }
+  else if (hat === 2) { x.fillStyle = '#ffd35a'; x.fillRect(-4, -12, 8, 3); x.fillStyle = '#fff1a8'; x.fillRect(-3, -15, 2, 3); x.fillRect(1, -15, 2, 3); x.fillRect(-1, -14, 2, 2); }
+  else if (hat === 3) { x.fillStyle = '#4fd8c8'; x.fillRect(-4, -12, 8, 2); x.fillStyle = '#c9fff6'; x.fillRect(-2, -15, 4, 3); x.fillStyle = '#8ff5e6'; x.fillRect(-1, -17, 2, 2); }
+}
 function drawRig(x, P, S, wp, wp2) {
   x.save();
   if (P.spin !== undefined) { const s = P.spin; x.scale(abs(s) < .3 ? (s < 0 ? -.3 : .3) : s, 1); }
@@ -299,7 +304,7 @@ function drawRig(x, P, S, wp, wp2) {
   if (wp2) { const L2 = ARM * clamp(P.armBext, .3, 1), hx2 = shx - 1.5 + cos(P.armB) * L2, hy2 = shy + sin(P.armB) * L2; x.save(); x.translate(hx2, hy2); x.rotate(P.w2Ang !== undefined ? P.w2Ang : P.armB - 1.05); x.drawImage(wp2.held, -wp2.grip[0], -wp2.grip[1]); x.restore(); }
   armDraw(x, shx - 1.5, shy, P.armB, P.armBext, S.armB, S.handB);
   legDraw(x, -.9, hipY, l2a, l2b, S.legB, S.boot); legDraw(x, .9, hipY, l1a, l1b, S.leg, S.boot);
-  x.save(); x.translate(0, hipY); x.rotate(lean); x.drawImage(S.torso, -3, -8 + P.bob); x.translate(0, -7 + P.bob); x.rotate(P.head); x.drawImage(S.head, S.hx, S.hy); x.restore();
+  x.save(); x.translate(0, hipY); x.rotate(lean); x.drawImage(S.torso, -3, -8 + P.bob); x.translate(0, -7 + P.bob); x.rotate(P.head); x.drawImage(S.head, S.hx, S.hy); drawHat(x, S.hat || 0); x.restore();
   const L = ARM * clamp(P.armExt, .3, 1), hx = shx + cos(P.armA) * L, hy = shy + sin(P.armA) * L;
   if (wp) {
     x.save(); x.translate(hx, hy); x.rotate(P.wAng); if (P.wFlip !== undefined) x.scale(abs(P.wFlip) < .18 ? (P.wFlip < 0 ? -.18 : .18) : P.wFlip, 1);
@@ -357,6 +362,7 @@ const TORCH_HELD = { held: null, grip: [2, 5] };
 function visHeld(f) { if (f.isPlayer && (f.toolT > 0 || f.toolCharge > 0) && f.swingTool && f.swingTool.held && !f.atk) return f.swingTool; if (f.isPlayer && (f.toolT > 0 || f.toolCharge > 0) && !f.atk && f.swingTool === HAND) return null; if (f === G.p) return f.atk && f.atk.W ? f.atk.W : heldItem() || heldOf(f); return heldOf(f); }
 function drawFighterRig(x, f, al, rx, ry) {
   const P = fighterPose(f, al), it = visHeld(f), S = f === G.p ? gearSkin(SK[f.skin] || SK[0], f.skin) : f.coop && f.gearObj ? gearSkinOf(f) : SK[f.skin] || SK[0];
+  S.hat = f.hat || 0;
   if (S.scarf) { const sc = f.scarf; for (let i = 1; i < sc.length; i++) seg(x, sc[i - 1].x - rx, sc[i - 1].y - ry, sc[i].x - rx, sc[i].y - ry, i < 3 ? 2.4 : 2, S.scarf[i % 2]); }
   let wp = null, wp2 = null; if (it) { if (it.held || it.chuks) { wp = it; if (it.dual) wp2 = it; } else if (it.id === 'torch') { TORCH_HELD.held = SPR.i_torch; wp = TORCH_HELD; } }
   x.save(); x.scale(f.face, 1); drawRig(x, P, S, wp, wp2); x.restore();

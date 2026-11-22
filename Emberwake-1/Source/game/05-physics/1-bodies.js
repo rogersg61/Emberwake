@@ -4,7 +4,7 @@
 const G = {
   state: 'title', time: 0, clock: .1, fires: [], smokes: [], stuck: [], linksKnown: new Set(), link: null, zoom: 1, zoomT: 1, armT: 0, linkBanner: null, hitstop: 0, shake: 0, tscale: 1, slowT: 0, p: null, enemies: [], fighters: [], npcs: [], drops: [], projs: [], nums: [], parts: [], trails: [], ghosts: [],
   flags: {}, combo: { n: 0, t: 0, pts: 0 }, feed: [], picks: [], cam: { x: 0, y: 0, px: 0, py: 0 }, boss: null, duel: null, flash: 0, flashCol: '255,255,255', sun: [1, 1, 1], dn: 1, spawnT: 0, biome: '', biomeT: 0,
-  sel: 0, selT: 0, known: new Set(), movesUsed: new Set(), journal: [], jNew: false, q: 0, qFlash: 0, says: [], sayCur: null, note: null, banner: null, dialog: null, kfeed: [], skin: 0, nick: '', dirty: false, played: 0, introI: 0, introT: 0
+  sel: 0, selT: 0, known: new Set(), movesUsed: new Set(), journal: [], jNew: false, q: 0, qFlash: 0, says: [], sayCur: null, note: null, banner: null, dialog: null, kfeed: [], skin: 0, hat: 0, nick: '', dirty: false, played: 0, introI: 0, introT: 0
 };
 const addShake = v => { G.shake = max(G.shake, v * .6); };
 {

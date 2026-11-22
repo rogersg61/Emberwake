@@ -32,7 +32,7 @@ function rlyBegin(P) {
   if (P.relay) return true; if (!rlyCan(P)) return false; const now = performance.now();
   Object.assign(P, { relay: true, rid: netGuest() ? 'h' : P.sig, rq: [], rqK: [], rqs: 0, rs: 0, rw: new Map(), ra: 0, rb: new Map(), rack: 0, rlast: 0, rbusy: false, rAckF: '', rto: 1500, srtt: 0, rT0: now, rHeard: 0 });
   P.open = true; P.heard = now;
-  if (netGuest() && !P.ok) sendTo(P, { t: 'hello', v: NETV, n: coopName(), sk: G.skin | 0 });
+  if (netGuest() && !P.ok) sendTo(P, { t: 'hello', v: NETV, n: coopName(), sk: G.skin | 0, ht: G.hat | 0 });
   return true;
 }
 // what goes out waits here for the next bundle; a newer "where I am" replaces an older one

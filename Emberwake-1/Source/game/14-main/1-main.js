@@ -517,7 +517,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return; keys[k] = true; pressed[k] = true;
   if (G.state === 'intro') { if (k === 'Enter' || k === 'Space') { audioInit(); advance(); } return; }
   if (G.state === 'brlobby') { if (k === 'Escape') { brLeave(); sfx('ui'); } return; }
-  if (G.state !== 'play') { if (k === 'Escape') { G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
+  if (G.state !== 'play') { if (k === 'Escape') { G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'accounts') ACCOUNT.form = 'list'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
   if (G.dialog) { if (k === 'KeyF' || k === 'Space' || k === 'Enter' || k === 'KeyE') { dialogAdvance(); pressed[k] = false; } return; }
   if (k === 'Escape' || k === 'KeyP') { if (UI.open) { closeUI(); sfx('ui'); } else toggleUI('pause'); return; }
   if ((k === 'Enter' || k === 'NumpadEnter') && chatKey()) return;
@@ -566,7 +566,7 @@ addEventListener('pagehide', e => {
 buildTiles(); buildTiles2(); buildSprites(); buildSprites2(); buildTiles3(); buildMobSprites(); buildDimArt(); buildPlaceArt(); buildBenchArt(); buildFurnArt(); buildDimMobs(); dimItemsPre(); buildItems(); brItems(); resize(); buildBayer();
 SIL = [genSil(31, 0), genSil(77, 1)]; for (let i = 0; i < 4; i++) VEILS.push(genVeil(i * 17));
 SHARDMOON = spr(['.....w.....', '....wWc....', '....WWc....', '...wWWcc...', '...WWWcc...', '..wWWWccc..', '..WWWWccd..', '.wWWWWcccd.', '..WWWccdd..', '..WWWcccd..', '...WWccd...', '...Wcccd...', '....ccd....', '....cd.....', '.....d.....'], { w: '#ffffff', W: '#dcf7f5', c: '#8fd0d8', d: '#62a9bc' });
-saveBoot(); netBoot();
+accountBoot(); saveBoot(); netBoot();
 Object.assign(WORLD, { id: '', name: 'Aldermere', seed: (Math.random() * 1e9) | 0, size: 0, shape: (Math.random() * 3) | 0, mode: 0, arena: false });
 SEED = WORLD.seed; genWorld(); freshSession(); G.p = newPlayer(); G.fighters = [G.p]; spawnNPCs(); G.clock = .3; updateSun();
 G.state = 'title'; G.cam.x = G.cam.px = camX((SPAWN_X - 70) * T); G.cam.y = G.cam.py = camY(heights[SPAWN_X - 40] * T - VS.vh * .62);

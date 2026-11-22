@@ -5,15 +5,61 @@
 //  (so worlds follow you between devices). Nobody else can read it.
 // ============================================================
 const SAVE = { db: null, uid: null, list: [], busy: false, pending: null, status: 'local', note: '' };
+const ACCOUNT = { profiles: [], active: null, form: 'list', note: '' };
 const LS = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch (e) { } }
 };
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
-const dpath = k => 'data/users/' + SAVE.uid + '/' + k;
-function readLocalIndex() { try { const a = JSON.parse(LS.get('ew2.index') || '[]'); return Array.isArray(a) ? a.filter(m => m && typeof m.id === 'string') : []; } catch (e) { return []; } }
-function writeLocalIndex() { LS.set('ew2.index', JSON.stringify(SAVE.list)); }
+const accountId = () => ACCOUNT.active ? ACCOUNT.active.id : 'none';
+const dpath = k => 'data/users/' + SAVE.uid + '/accounts/' + accountId() + '/' + k;
+const profileKey = k => 'ew2.p.' + accountId() + '.' + k;
+function readAccountProfiles() { try { const a = JSON.parse(LS.get('ew2.accounts') || '[]'); return Array.isArray(a) ? a.filter(p => p && typeof p.id === 'string' && typeof p.name === 'string') : []; } catch (e) { return []; } }
+function writeAccountProfiles() { LS.set('ew2.accounts', JSON.stringify(ACCOUNT.profiles)); }
+function accountBoot() {
+  ACCOUNT.profiles = readAccountProfiles();
+  if (!ACCOUNT.profiles.length) {
+    const guest = { id: 'guest', name: 'Guest', skin: 0, hat: 0, pin: '' };
+    ACCOUNT.profiles = [guest]; writeAccountProfiles();
+  }
+  let active = LS.get('ew2.active');
+  ACCOUNT.active = ACCOUNT.profiles.find(p => p.id === active) || ACCOUNT.profiles[0];
+  G.nick = ACCOUNT.active.name; G.skin = clamp(ACCOUNT.active.skin | 0, 0, 5); G.hat = clamp(ACCOUNT.active.hat | 0, 0, 3);
+  LS.set('ew2.active', ACCOUNT.active.id);
+  SAVE.list = readLocalIndex(); sortWorlds();
+}
+function cleanAccountName(s) { s = String(s || '').trim().replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 18); return s; }
+function accountCreate(name, pin, skin, hat) {
+  name = cleanAccountName(name) || 'WAKER';
+  pin = String(pin || '').replace(/[^0-9]/g, '').slice(0, 8);
+  const p = { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name, skin: clamp(skin | 0, 0, 5), hat: clamp(hat | 0, 0, 3), pin };
+  ACCOUNT.profiles.push(p); writeAccountProfiles(); accountSwitch(p.id); ACCOUNT.note = 'Account created.';
+}
+function accountSwitch(id) {
+  const p = ACCOUNT.profiles.find(v => v.id === id); if (!p) return false;
+  ACCOUNT.active = p; LS.set('ew2.active', p.id); G.nick = p.name; G.skin = clamp(p.skin | 0, 0, 5); G.hat = clamp(p.hat | 0, 0, 3);
+  if (FORM) { FORM.nick = p.name; FORM.skin = G.skin; FORM.hat = G.hat; }
+  SAVE.list = readLocalIndex(); sortWorlds(); ACCOUNT.note = 'Logged in as ' + p.name + '.';
+  return true;
+}
+function accountLogin(p, pin) {
+  if (p.pin && String(pin || '') !== p.pin) { ACCOUNT.note = 'Wrong PIN.'; return false; }
+  accountSwitch(p.id); G.state = 'title'; return true;
+}
+function accountSaveProfile() {
+  if (!ACCOUNT.active) return;
+  ACCOUNT.active.skin = G.skin; ACCOUNT.active.hat = G.hat; ACCOUNT.active.name = G.nick || ACCOUNT.active.name;
+  writeAccountProfiles();
+}
+function readLocalIndex() {
+  try {
+    const own = LS.get(profileKey('index'));
+    const raw = own !== null ? own : (accountId() === 'guest' ? LS.get('ew2.index') : null);
+    const a = JSON.parse(raw || '[]'); return Array.isArray(a) ? a.filter(m => m && typeof m.id === 'string') : [];
+  } catch (e) { return []; }
+}
+function writeLocalIndex() { LS.set(profileKey('index'), JSON.stringify(SAVE.list)); }
 function saveBoot() {
   SAVE.list = readLocalIndex(); sortWorlds();
   try {
@@ -31,7 +77,7 @@ function saveBoot() {
   } catch (e) { }
 }
 function sortWorlds() { SAVE.list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)); }
-function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
+function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, hat: G.hat, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
 function snapshotWorld() {
   const p = G.p;
   return Object.assign(worldMeta(), {
@@ -44,7 +90,7 @@ function snapshotWorld() {
 function saveWorld(quiet) {
   if (WORLD.arena || WORLD.guest || !WORLD.id || (G.state !== 'play' && G.state !== 'intro') || !G.p) return;
   const data = snapshotWorld(), meta = worldMeta();
-  const okLocal = LS.set('ew2.w.' + WORLD.id, JSON.stringify(data));
+  const okLocal = LS.set(profileKey('w.' + WORLD.id), JSON.stringify(data));
   const i = SAVE.list.findIndex(m => m.id === WORLD.id); if (i < 0) SAVE.list.unshift(meta); else SAVE.list[i] = Object.assign(SAVE.list[i], meta);
   sortWorlds(); writeLocalIndex(); G.dirty = false; G.saveT = 0;
   if (SAVE.db) { SAVE.pending = data; if (!SAVE.busy) pumpSaves(); }
@@ -69,7 +115,12 @@ async function pumpSaves() {
   SAVE.busy = false;
 }
 async function loadWorldData(id) {
-  let local = null; try { local = JSON.parse(LS.get('ew2.w.' + id) || 'null'); } catch (e) { }
+  let local = null;
+  try {
+    const own = LS.get(profileKey('w.' + id));
+    const raw = own !== null ? own : (accountId() === 'guest' ? LS.get('ew2.w.' + id) : null);
+    local = JSON.parse(raw || 'null');
+  } catch (e) { }
   let remote = null;
   if (SAVE.db) {
     try {
@@ -83,7 +134,7 @@ async function loadWorldData(id) {
   return remote && (!local || (remote.savedAt || 0) > (local.savedAt || 0)) ? remote : local;
 }
 function deleteWorld(id) {
-  const m = SAVE.list.find(l => l.id === id); SAVE.list = SAVE.list.filter(l => l.id !== id); writeLocalIndex(); LS.del('ew2.w.' + id);
+  const m = SAVE.list.find(l => l.id === id); SAVE.list = SAVE.list.filter(l => l.id !== id); writeLocalIndex(); LS.del(profileKey('w.' + id)); if (accountId() === 'guest') LS.del('ew2.w.' + id);
   if (SAVE.db && m) (async () => {
     try {
       const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000); const n = s && s.exists ? (s.data().mparts || 0) : 0;
@@ -100,14 +151,14 @@ function seedFrom(text) {
 const FORGE_KIT_OLD = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku', 'pick2', 'torch', 'plank', 'brick', 'platform', 'dirt', 'stone', 'sandstone', 'snow', 'sand', 'ash', 'deepstone', 'bench', 'furnace', 'salve', 'kblade', 'kmaul', 'vpike', 'vfangs', 'shuriken', 'hook', 'flask', 'smoke'];
 function createWorld(o) {
   Object.assign(WORLD, { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name: o.name || 'Aldermere', seed: seedFrom(o.seed), size: o.size, shape: o.shape, mode: o.mode, arena: false });
-  G.skin = o.skin; startWorld(null);
+  G.skin = o.skin; G.hat = o.hat || 0; accountSaveProfile(); startWorld(null);
 }
 async function openWorld(meta) {
   G.state = 'loading'; G.loadMsg = 'Opening ' + meta.name + '...';
   const data = await loadWorldData(meta.id);
   if (!data) { SAVE.list = SAVE.list.filter(l => l.id !== meta.id); writeLocalIndex(); G.state = 'worlds'; G.menuNote = 'That world could not be found.'; return; }
   Object.assign(WORLD, { id: data.id, name: data.name, seed: data.seed | 0, size: clamp(data.size | 0, 0, 2), shape: clamp(data.shape | 0, 0, 2), mode: data.mode ? 1 : 0, arena: false });
-  G.skin = clamp(data.skin | 0, 0, 3); startWorld(data);
+  G.skin = clamp(data.skin | 0, 0, 5); G.hat = clamp(data.hat | 0, 0, 3); accountSaveProfile(); startWorld(data);
 }
 function startWorld(data) {
   G.state = 'loading'; G.loadMsg = data ? 'Rebuilding ' + WORLD.name + '...' : 'Forging ' + WORLD.name + '...';

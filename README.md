@@ -2,7 +2,7 @@
 
 **Emberwake** is a 2D pixel-art open-world action game inspired by *Terraria*. Gather resources, build a settlement, learn weapon styles, explore four linked worlds, and face powerful guardians—alone or with up to three friends.
 
-Made with freemessycello — a self-contained HTML game with no external runtime dependencies.
+Made with freemessycello and fish.co — a self-contained HTML game with no external runtime dependencies.
 
 ![Emberwake title screen](Emberwake-1/Source/guide/pictures/title.jpg)
 

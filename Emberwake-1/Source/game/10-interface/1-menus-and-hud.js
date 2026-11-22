@@ -4,7 +4,7 @@
 //  a hit box while it draws; clicks test last frame's boxes.
 // ============================================================
 const inR = (x, y, w, h) => mouse.ux >= x && mouse.ux < x + w && mouse.uy >= y && mouse.uy < y + h;
-const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, nick: '', code: '' };
+const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', accountName: '', accountPin: '' };
 const SIZE_D = ['600 x 260 tiles', '900 x 320 tiles', '1400 x 380 tiles', '2200 x 440 tiles: days to cross'], SHAPE_D = ['every seed deals its lands in a new order', 'the Drift is crowded with islands', 'few islands, the Underdark yawns wider'], MODE_D = ['three embers, any order, nothing forced', 'every item, no monsters, build freely'];
 let HITS = [], HITS_NEXT = [];
 const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!slot });
@@ -36,10 +36,18 @@ function chooser(c, x, y, w, label, names, key, descs) {
 }
 function skinPicker(c, x, y) {
   drawText(c, 'LOOK', x, y + 8, '#b9bdd0');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < SKINS.length; i++) {
     const bx = x + 46 + i * 24, on = FORM.skin === i; c.fillStyle = on ? '#ffd35a' : inR(bx, y, 20, 22) ? '#8c86a8' : '#4a4460'; c.fillRect(bx, y, 20, 22); c.fillStyle = '#262234'; c.fillRect(bx + 1, y + 1, 18, 20);
     c.drawImage(SK[i].head, bx + 3, y + 2, 14, 14); c.fillStyle = SKINS[i][4]; c.fillRect(bx + 3, y + 17, 7, 2); c.fillStyle = SKINS[i][0]; c.fillRect(bx + 10, y + 17, 7, 2);
     hit(bx, y, 20, 22, () => { FORM.skin = i; sfx('ui'); });
+  }
+}
+function hatPicker(c, x, y) {
+  const names = ['NO HAT', 'EMBER', 'CROWN', 'FROST'];
+  drawText(c, 'HAT', x, y + 8, '#b9bdd0');
+  for (let i = 0; i < names.length; i++) {
+    const bx = x + 46 + i * 48, on = FORM.hat === i;
+    button(c, bx, y, 44, 16, names[i], () => { FORM.hat = i; sfx('ui'); }, { on });
   }
 }
 function slotBox(c, x, y, sel, hov) { c.fillStyle = sel ? '#ffd35a' : hov ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, 18, 18); c.fillStyle = sel ? '#3a3350' : '#262234'; c.fillRect(x + 1, y + 1, 16, 16); }
@@ -126,7 +134,8 @@ function drawTitle(c) {
   button(c, bx, by + 23, bw, 18, 'JOIN A FRIEND', () => { G.state = 'join'; UI.focus = null; COOP.err = ''; COOP.note = ''; COOP.long = false; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
   button(c, bx, by + 46, bw, 18, 'THE CINDER RING : ONLINE PVP', () => { G.state = 'ring'; UI.focus = null; if (!FORM.nick) FORM.nick = 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
   button(c, bx, by + 69, bw, 18, 'THE ASHFALL : BATTLE ROYALE', () => { G.state = 'brform'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); if (FORM.brcode === undefined) FORM.brcode = ''; sfx('ui'); });
-  button(c, bx, by + 92, bw, 18, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
+  button(c, bx, by + 92, bw, 18, 'ACCOUNT: ' + (ACCOUNT.active ? ACCOUNT.active.name.toUpperCase().slice(0, 16) : 'GUEST'), () => { G.state = 'accounts'; ACCOUNT.note = ''; UI.focus = null; sfx('ui'); });
+  button(c, bx, by + 115, bw, 18, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
   textC(c, 'build, explore, and fight with every form', uw / 2, uh - 26, '#d8d4e6', 1, textO);
   textC(c, 'mouse + keyboard', uw / 2, uh - 15, '#8b8fa3', 1, textO);
   const vs = 'version ' + GAME_VERSION; textS(c, vs, uw - textW(vs) - 4, uh - 10, '#6a6485');
@@ -140,7 +149,7 @@ function drawWorlds(c) {
   for (let i = 0; i < vis; i++) {
     const m = SAVE.list[i + UI.scroll]; if (!m) break; const ry = y + 16 + i * rowH, hv = inR(x + 4, ry, w - 8, rowH - 3);
     c.fillStyle = hv ? '#2b2740' : '#221e30'; c.fillRect(x + 4, ry, w - 8, rowH - 3);
-    c.drawImage(SK[clamp(m.skin | 0, 0, 3)].head, x + 8, ry + 4, 14, 14); if (!m.mode) for (let k = 0; k < 3; k++) { c.fillStyle = k < (m.e | 0) ? ['#ffd35a', '#8ff5e6', '#ff9a3d'][k] : '#3a3450'; c.fillRect(x + 9 + k * 4, ry + 19, 3, 2); }
+    c.drawImage(SK[clamp(m.skin | 0, 0, 5)].head, x + 8, ry + 4, 14, 14); if (!m.mode) for (let k = 0; k < 3; k++) { c.fillStyle = k < (m.e | 0) ? ['#ffd35a', '#8ff5e6', '#ff9a3d'][k] : '#3a3450'; c.fillRect(x + 9 + k * 4, ry + 19, 3, 2); }
     drawText(c, String(m.name || 'World').slice(0, 24), x + 28, ry + 3, '#fff');
     const prog = m.mode ? 'free forge' : m.v < 3 ? 'old world (will regrow)' : (m.e | 0) + ' of 3 embers';
     { let info = `${MODE_N[m.mode ? 1 : 0]} - ${m.endless ? (GEN_RANGE_N[m.size | 0] || 'Normal') + ' range' : SIZE_N[m.size | 0] || ''} - ${SHAPE_N[m.shape | 0] || ''} - ${prog} - ${fmtTime(m.played || 0)}`; const room = w - 160; if (textW(info) > room) info = `${prog} - ${fmtTime(m.played || 0)}`; while (info.length > 4 && textW(info) > room) info = info.slice(0, -1); drawText(c, info, x + 28, ry + 13, '#8b8fa3'); }
@@ -161,7 +170,7 @@ function drawWorlds(c) {
   button(c, x + w - 66, y + h - 20, 60, 15, 'BACK', () => { G.state = 'title'; G.worldNote = ''; sfx('ui'); });
 }
 function drawCreate(c) {
-  const uw = VS.uw, uh = VS.uh, w = min(300, uw - 16), h = 236, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  const uw = VS.uw, uh = VS.uh, w = min(300, uw - 16), h = 258, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FORGE A NEW WORLD');
   const fx = x + 10, fw = w - 20;
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'name', 'my world');
@@ -170,8 +179,54 @@ function drawCreate(c) {
   chooser(c, fx, y + 92, fw, 'SHAPE', SHAPE_N, 'shape', SHAPE_D);
   chooser(c, fx, y + 124, fw, 'MODE', MODE_N, 'mode', MODE_D);
   skinPicker(c, fx, y + 158);
-  button(c, x + 10, y + h - 26, 140, 18, 'FORGE WORLD', () => { UI.focus = null; createWorld({ name: FORM.name.trim() || 'World', seed: FORM.seed, size: FORM.size, shape: FORM.shape, mode: FORM.mode, skin: FORM.skin }); sfx('quest', 0); });
+  hatPicker(c, fx, y + 188);
+  button(c, x + 10, y + h - 26, 140, 18, 'FORGE WORLD', () => { UI.focus = null; createWorld({ name: FORM.name.trim() || 'World', seed: FORM.seed, size: FORM.size, shape: FORM.shape, mode: FORM.mode, skin: FORM.skin, hat: FORM.hat }); sfx('quest', 0); });
   button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { G.state = 'worlds'; UI.focus = null; sfx('ui'); });
+}
+function drawAccounts(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(340, uw - 16), h = min(240, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'ACCOUNTS');
+  const fx = x + 10, fw = w - 20;
+  if (ACCOUNT.form === 'create') {
+    drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'accountName', 'account name');
+    drawText(c, 'PIN', fx, y + 42, '#b9bdd0'); field(c, fx + 46, y + 38, fw - 46, 'accountPin', 'optional numbers');
+    skinPicker(c, fx, y + 58);
+    hatPicker(c, fx, y + 88);
+    button(c, x + 10, y + h - 26, 150, 18, 'CREATE ACCOUNT', () => {
+      UI.focus = null;
+      accountCreate(FORM.accountName, FORM.accountPin, FORM.skin, FORM.hat);
+      G.skin = FORM.skin; G.hat = FORM.hat; G.nick = ACCOUNT.active.name;
+      ACCOUNT.form = 'list';
+      sfx('quest', 0);
+    });
+    button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
+  } else {
+    const rowH = 28, start = y + 18;
+    for (let i = 0; i < ACCOUNT.profiles.length; i++) {
+      const p = ACCOUNT.profiles[i], ry = start + i * rowH, active = ACCOUNT.active && ACCOUNT.active.id === p.id;
+      c.fillStyle = active ? '#3d3320' : inR(x + 6, ry, w - 12, rowH - 4) ? '#2b2740' : '#221e30';
+      c.fillRect(x + 6, ry, w - 12, rowH - 3);
+      c.drawImage(SK[clamp(p.skin | 0, 0, 5)].head, x + 10, ry + 5, 14, 14);
+      drawText(c, p.name, x + 30, ry + 7, active ? '#ffd35a' : '#fff');
+      button(c, x + w - 82, ry + 4, 74, 14, active ? 'ACTIVE' : p.pin ? 'PIN + LOGIN' : 'LOGIN', () => {
+        if (active) { G.state = 'title'; return; }
+        if (p.pin) { ACCOUNT.form = 'pin'; ACCOUNT.loginId = p.id; FORM.accountPin = ''; UI.focus = 'accountPin'; } else accountLogin(p, '');
+        sfx('ui');
+      }, { off: active });
+    }
+    if (ACCOUNT.form === 'pin') {
+      const p = ACCOUNT.profiles.find(v => v.id === ACCOUNT.loginId);
+      panel(c, x + 8, y + h - 76, w - 16, 48, 'ENTER PIN');
+      drawText(c, p ? p.name : 'Account', x + 16, y + h - 54, '#b9bdd0');
+      field(c, x + 70, y + h - 58, 70, 'accountPin', 'numbers');
+      button(c, x + w - 94, y + h - 58, 84, 14, 'LOG IN', () => { const q = ACCOUNT.profiles.find(v => v.id === ACCOUNT.loginId); if (q) accountLogin(q, FORM.accountPin); if (G.state === 'accounts') ACCOUNT.form = 'list'; sfx('ui'); });
+    }
+    button(c, x + 6, y + h - 22, 150, 16, '+ CREATE ACCOUNT', () => {
+      ACCOUNT.form = 'create'; FORM.accountName = ''; FORM.accountPin = ''; if (!FORM.skin) FORM.skin = 0; if (!FORM.hat) FORM.hat = 0; UI.focus = 'accountName'; sfx('ui');
+    });
+    button(c, x + w - 66, y + h - 22, 60, 16, 'BACK', () => { G.state = 'title'; ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
+  }
+  if (ACCOUNT.note) textC(c, ACCOUNT.note, uw / 2, y + h - 3, '#8ff5e6', 1, textO);
 }
 function drawRingForm(c) {
   const uw = VS.uw, uh = VS.uh, w = min(330, uw - 16), h = 214, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
@@ -395,7 +450,7 @@ function drawDialog(c) {
 }
 function drawUI(c) {
   HITS_NEXT = []; const uw = VS.uw, uh = VS.uh, st = G.state;
-  if (st === 'title') drawTitle(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
+  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
   else if (st === 'loading') { c.fillStyle = 'rgba(18,13,31,.82)'; c.fillRect(0, 0, uw, uh); textC(c, G.loadMsg || 'Loading...', uw / 2, round(uh * .45), '#fff1a8', 1, textO); const n = (performance.now() / 300 | 0) % 4; textC(c, '.'.repeat(n), uw / 2, round(uh * .45) + 12, '#ffd35a', 1, textO); }
   else if (st === 'intro') {
     c.fillStyle = 'rgba(18,13,31,.84)'; c.fillRect(0, 0, uw, uh);
