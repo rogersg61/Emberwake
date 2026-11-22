@@ -5810,6 +5810,17 @@ function startAttack(f, btn, I, force) {
   const tempoMul = f.isPlayer ? [1, 1.04, 1.1, 1.18][tempoTier] : 1;
   const snappedMul = f.isPlayer && f.snapped > 0 ? .62 : 1;
   a.gm = (a.gm || 1) * timingMul * tempoMul * snappedMul;
+  if (f.isPlayer && f.phraseSurge) {
+    const surge = f.phraseSurge;
+    if (surge.effect === 'burst') a.gm *= 1.35;
+    else if (surge.effect === 'lift') { a.crit = true; a.gm *= 1.18; m.launch = 1; }
+    else if (surge.effect === 'crush') { a.gm *= 1.28; m = Object.assign({}, m, { flow: 'down', stagger: max(m.stagger || 0, 60) }); a.m = m; }
+    else if (surge.effect === 'guard') f.iDodge = max(f.iDodge, 18);
+    else if (surge.effect === 'rally') { f.hp = min(f.maxhp, f.hp + max(2, round(f.maxhp * .03))); f.stam = min(f.maxstam, f.stam + 20); }
+    else if (surge.effect === 'echo') { a.echo = 1; a.gm *= 1.12; }
+    numPop(f.x + 3, f.y - 14, surge.effect.toUpperCase(), '#8ff5e6', .8);
+    f.phraseSurge = null;
+  }
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -5947,46 +5958,124 @@ function reflectProj(pr, a) {
   fsx(a.f, 'reflect'); sparks(pr.x, pr.y, 10); numPop(pr.x, pr.y - 6, 'DEFLECT', '#8ff5e6'); if (a.f === G.p) { G.hitstop = max(G.hitstop, 3); comboHit(true); }
 }
 function comboHit(fresh) { const c = G.combo; c.n++; c.t = 180; c.pts += fresh ? 3 : 1; }
-const CADENCE = {
-  sword: ['L', 'L', 'H'],
-  spear: ['L', 'H', 'L', 'H'],
-  fangs: ['L', 'L', 'L', 'H'],
-  maul: ['H', 'L', 'H'],
-  bow: ['L', 'H', 'L'],
-  chuks: ['L', 'L', 'H'],
-  brawl: ['L', 'H', 'L', 'H']
+const COMBAT_PHRASES = {
+  sword: [
+    { name: 'Kindled Arc', pattern: ['L', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Red Hook', pattern: ['L', 'H', 'L'], effect: 'lift', desc: 'opens with an airborne finisher' },
+    { name: 'Ash Cross', pattern: ['H', 'L', 'L', 'H'], effect: 'crush', desc: 'finishes with crushing force' },
+    { name: 'Glass Answer', pattern: ['L', 'H', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Ember Wheel', pattern: ['L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Sundered Dawn', pattern: ['H', 'H', 'L', 'H'], effect: 'echo', desc: 'next heavy repeats a shadow edge' }
+  ],
+  spear: [
+    { name: 'Pike Rain', pattern: ['L', 'H', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Heron Step', pattern: ['L', 'L', 'H'], effect: 'lift', desc: 'launches the next target' },
+    { name: 'Wind Spear', pattern: ['H', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Fence and Fall', pattern: ['L', 'H', 'H', 'L'], effect: 'crush', desc: 'heavy follow-up crushes open foes' },
+    { name: 'Turning Point', pattern: ['H', 'L', 'L', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Thousand Paces', pattern: ['L', 'L', 'L', 'H', 'L'], effect: 'echo', desc: 'next thrust echoes once' }
+  ],
+  fangs: [
+    { name: 'Twin Bite', pattern: ['L', 'L', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Viper Coil', pattern: ['L', 'H', 'L', 'L'], effect: 'lift', desc: 'launches the next target' },
+    { name: 'Red Needle', pattern: ['H', 'L', 'L', 'H'], effect: 'echo', desc: 'next light strike repeats once' },
+    { name: 'Shadow Reel', pattern: ['L', 'L', 'H', 'L', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Wild Hunger', pattern: ['H', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Heartseeker', pattern: ['L', 'H', 'L', 'H', 'H'], effect: 'crush', desc: 'heavy follow-up crushes open foes' }
+  ],
+  maul: [
+    { name: 'Bell Toll', pattern: ['H', 'L', 'H'], effect: 'crush', desc: 'heavy follow-up crushes open foes' },
+    { name: 'Mountain Roll', pattern: ['L', 'H', 'H', 'L'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Hearthfall', pattern: ['H', 'H', 'L'], effect: 'echo', desc: 'next heavy repeats a shadow edge' },
+    { name: 'Stone Kneel', pattern: ['L', 'L', 'H', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Worldbeat', pattern: ['H', 'L', 'L', 'H', 'H'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Ruin Meter', pattern: ['L', 'H', 'L', 'H', 'H'], effect: 'lift', desc: 'launches the next target' }
+  ],
+  bow: [
+    { name: 'Quick Pair', pattern: ['L', 'H', 'L'], effect: 'burst', desc: 'next shot surges with 35% force' },
+    { name: 'Running Cadence', pattern: ['L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'High Flight', pattern: ['H', 'L', 'H'], effect: 'lift', desc: 'next volley lifts airborne foes' },
+    { name: 'Arrow Hush', pattern: ['L', 'H', 'H', 'L'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Branch Storm', pattern: ['H', 'L', 'L', 'H', 'L'], effect: 'echo', desc: 'next shot repeats once' },
+    { name: 'Stars and Ash', pattern: ['L', 'H', 'L', 'H', 'H'], effect: 'crush', desc: 'finishes with crushing force' }
+  ],
+  chuks: [
+    { name: 'Figure Eight', pattern: ['L', 'L', 'H'], effect: 'echo', desc: 'next light strike repeats once' },
+    { name: 'Dragon Coil', pattern: ['L', 'H', 'L', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Bell Chain', pattern: ['H', 'L', 'L', 'H'], effect: 'crush', desc: 'finishes with crushing force' },
+    { name: 'Rebound', pattern: ['L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Rattlestorm', pattern: ['H', 'H', 'L', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Ghost Wheel', pattern: ['L', 'H', 'H', 'L', 'H'], effect: 'lift', desc: 'launches the next target' }
+  ],
+  brawl: [
+    { name: 'Fist Rhythm', pattern: ['L', 'H', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Heel and Knuckle', pattern: ['L', 'L', 'H'], effect: 'crush', desc: 'finishes with crushing force' },
+    { name: 'Counterbeat', pattern: ['H', 'L', 'H', 'L'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Uppercut Spree', pattern: ['L', 'H', 'H', 'L'], effect: 'lift', desc: 'launches the next target' },
+    { name: 'Second Wind', pattern: ['H', 'L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'No Rest', pattern: ['L', 'L', 'H', 'L', 'H'], effect: 'echo', desc: 'next strike repeats once' }
+  ]
 };
+function advancePhraseBranch(f, setName, btn) {
+  const phrases = COMBAT_PHRASES[setName] || COMBAT_PHRASES.sword;
+  const seq = ((f.cadenceSeq || '') + btn).slice(-8);
+  const exact = phrases.findIndex(p => p.pattern.join('') === seq);
+  if (exact >= 0) {
+    f.cadenceIndex = exact;
+    f.cadenceStep = 0;
+    f.cadenceSeq = '';
+    f.cadenceT = 180;
+    f.dissonance = max(0, (f.dissonance || 0) - 12);
+    return { complete: phrases[exact] };
+  }
+  let candidates = phrases.map((p, i) => ({ p, i })).filter(q => q.p.pattern.join('').startsWith(seq));
+  if (candidates.length) {
+    const current = phrases[f.cadenceIndex || 0];
+    const curKey = current ? current.pattern.join('') : '';
+    const same = candidates.find(q => q.i === (f.cadenceIndex || 0) && curKey.startsWith(seq));
+    const next = same || candidates[0];
+    f.cadenceIndex = next.i;
+    f.cadenceStep = seq.length;
+    f.cadenceSeq = seq;
+    f.cadenceT = 180;
+    f.dissonance = max(0, (f.dissonance || 0) - 8);
+    return { complete: null, phrase: next.p };
+  }
+  const retry = btn;
+  candidates = phrases.map((p, i) => ({ p, i })).filter(q => q.p.pattern[0] === retry);
+  if (candidates.length) {
+    f.cadenceIndex = candidates[0].i;
+    f.cadenceStep = 1;
+    f.cadenceSeq = retry;
+    f.cadenceT = 180;
+    f.dissonance = max(0, (f.dissonance || 0) - 3);
+    return { complete: null, phrase: candidates[0].p };
+  }
+  f.cadenceStep = 0;
+  f.cadenceSeq = '';
+  f.cadenceT = 180;
+  f.dissonance = min(100, (f.dissonance || 0) + 24);
+  f.fray = min(100, (f.fray || 0) + 12);
+  return { complete: null, dissonant: true };
+}
 function combatTempoHit(f, a, e) {
   if (!f.isPlayer || f.snapped > 0) return;
   const timing = a.timing || 'normal';
   if (f.repeatMove === a.id && f.tempoT > 0) f.repeatCount = min(5, (f.repeatCount || 0) + 1);
   else { f.repeatMove = a.id; f.repeatCount = 1; }
   f.tempoT = 150;
-  const pattern = CADENCE[a.setName] || CADENCE.sword;
-  const step = f.cadenceStep || 0;
-  if (a.btn === pattern[step % pattern.length]) {
-    f.cadenceStep = step + 1;
-    f.cadenceSeq = (f.cadenceSeq || '') + a.btn;
-    f.cadenceT = 180;
-    f.dissonance = max(0, (f.dissonance || 0) - 8);
-    if (f.cadenceStep >= pattern.length) {
-      f.cadenceStep = 0;
-      f.cadenceSeq = '';
-      f.cadencePhrase = (f.cadencePhrase || 0) + 1;
-      f.tempo = min(100, (f.tempo || 0) + 30);
-      f.fray = max(0, (f.fray || 0) - 28);
-      f.dissonance = max(0, (f.dissonance || 0) - 45);
-      f.stam = min(f.maxstam, f.stam + 8);
-      numPop(f.x + 3, f.y - 18, 'PHRASE COMPLETE', '#ffd35a', .9);
-      sparks(f.x + 3, f.y + 6, 12, f.face, 2.2, ['#ffd35a', '#fff1a8', '#8ff5e6']);
-      sfx('newmove', 0);
-    }
-  } else {
-    f.cadenceStep = a.btn === pattern[0] ? 1 : 0;
-    f.cadenceSeq = f.cadenceStep ? a.btn : '';
-    f.cadenceT = 180;
-    f.dissonance = min(100, (f.dissonance || 0) + 18);
-    f.fray = min(100, (f.fray || 0) + 8);
+  const branch = advancePhraseBranch(f, a.setName, a.btn);
+  if (branch.complete) {
+    const phrase = branch.complete;
+    f.cadencePhrase = (f.cadencePhrase || 0) + 1;
+    f.tempo = min(100, (f.tempo || 0) + 30);
+    f.fray = max(0, (f.fray || 0) - 28);
+    f.dissonance = max(0, (f.dissonance || 0) - 45);
+    f.stam = min(f.maxstam, f.stam + 8);
+    f.phraseSurge = { name: phrase.name, effect: phrase.effect, t: 180 };
+    numPop(f.x + 3, f.y - 18, phrase.name.toUpperCase(), '#ffd35a', .9);
+    sparks(f.x + 3, f.y + 6, 12, f.face, 2.2, ['#ffd35a', '#fff1a8', '#8ff5e6']);
+    sfx('newmove', 0);
   }
   if (timing === 'rushed') {
     f.fray = min(100, (f.fray || 0) + 24);
@@ -6039,6 +6128,7 @@ function applyHit(a, e, hx, hy) {
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
   if (!strike(f, e, dmg, kx, m.kb[1], { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  if (a.echo) { a.echo = 0; strike(f, e, max(1, round(dmg * .45)), kx * .6, m.kb[1] * .5, { stagger: 12, crit: false, stop: 2, blunt: m.blunt, cold: a.W.cold, hx, hy }); }
   if (P0) combatTempoHit(f, a, e);
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
@@ -6978,7 +7068,8 @@ function newFighter(x, y, o) {
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
     tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
-    cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0
+    cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
+    cadenceIndex: 0, phraseSurge: null
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -7049,6 +7140,7 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
   if (f.snapped > 0) f.snapped--;
   if (f.tempoT > 0) f.tempoT--;
   if (f.tempoT <= 0) f.tempo = max(0, (f.tempo || 0) - .12);
@@ -7059,12 +7151,6 @@ function tickFighter(f, I) {
     f.cadenceStep = 0;
     f.cadenceSeq = '';
     f.dissonance = min(100, (f.dissonance || 0) + 10);
-  }
-  if (f.cadenceT > 0) f.cadenceT--;
-  else if (f.cadenceStep > 0) {
-    f.cadenceStep = 0;
-    f.cadenceSeq = '';
-    f.tempo = max(0, (f.tempo || 0) - 8);
   }
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
@@ -9274,10 +9360,15 @@ function drawTempoHud(c) {
   c.fillStyle = fray >= 70 ? '#ff6b6b' : fray >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * max(fray, p.dissonance || 0) / 100), 2);
   const W = heldItem();
   if (W && W.type === 'weapon') {
-    const pattern = { sword: ['L', 'L', 'H'], spear: ['L', 'H', 'L', 'H'], fangs: ['L', 'L', 'L', 'H'], maul: ['H', 'L', 'H'], bow: ['L', 'H', 'L'], chuks: ['L', 'L', 'H'], brawl: ['L', 'H', 'L', 'H'] }[W.set] || ['L', 'L', 'H'];
-    let phrase = '';
-    for (let i = 0; i < pattern.length; i++) phrase += i === (p.cadenceStep || 0) % pattern.length && (p.cadenceStep || 0) < pattern.length ? '[' + pattern[i] + '] ' : pattern[i] + ' ';
-    textS(c, 'PHRASE ' + phrase.trim(), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+    const phrases = COMBAT_PHRASES[W.set] || COMBAT_PHRASES.sword;
+    const phrase = phrases[p.cadenceIndex || 0] || phrases[0];
+    const seq = p.cadenceSeq || '';
+    const branches = phrases.filter(q => q.pattern.join('').startsWith(seq));
+    const next = [];
+    for (const q of branches) { const b = q.pattern[seq.length]; if (b && !next.includes(b)) next.push(b); }
+    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  BRANCH`;
+    if (next.length) line += '  NEXT ' + next.join('/');
+    textS(c, fitText(line.trim(), 180), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
   }
   if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
 }

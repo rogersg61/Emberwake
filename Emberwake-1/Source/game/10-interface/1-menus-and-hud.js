@@ -134,10 +134,15 @@ function drawTempoHud(c) {
   c.fillStyle = fray >= 70 ? '#ff6b6b' : fray >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * max(fray, p.dissonance || 0) / 100), 2);
   const W = heldItem();
   if (W && W.type === 'weapon') {
-    const pattern = { sword: ['L', 'L', 'H'], spear: ['L', 'H', 'L', 'H'], fangs: ['L', 'L', 'L', 'H'], maul: ['H', 'L', 'H'], bow: ['L', 'H', 'L'], chuks: ['L', 'L', 'H'], brawl: ['L', 'H', 'L', 'H'] }[W.set] || ['L', 'L', 'H'];
-    let phrase = '';
-    for (let i = 0; i < pattern.length; i++) phrase += i === (p.cadenceStep || 0) % pattern.length && (p.cadenceStep || 0) < pattern.length ? '[' + pattern[i] + '] ' : pattern[i] + ' ';
-    textS(c, 'PHRASE ' + phrase.trim(), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+    const phrases = COMBAT_PHRASES[W.set] || COMBAT_PHRASES.sword;
+    const phrase = phrases[p.cadenceIndex || 0] || phrases[0];
+    const seq = p.cadenceSeq || '';
+    const branches = phrases.filter(q => q.pattern.join('').startsWith(seq));
+    const next = [];
+    for (const q of branches) { const b = q.pattern[seq.length]; if (b && !next.includes(b)) next.push(b); }
+    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  BRANCH`;
+    if (next.length) line += '  NEXT ' + next.join('/');
+    textS(c, fitText(line.trim(), 180), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
   }
   if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
 }

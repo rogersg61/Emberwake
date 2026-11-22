@@ -23,7 +23,8 @@ function newFighter(x, y, o) {
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
     tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
-    cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0
+    cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
+    cadenceIndex: 0, phraseSurge: null
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -94,6 +95,7 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
   if (f.snapped > 0) f.snapped--;
   if (f.tempoT > 0) f.tempoT--;
   if (f.tempoT <= 0) f.tempo = max(0, (f.tempo || 0) - .12);
@@ -104,12 +106,6 @@ function tickFighter(f, I) {
     f.cadenceStep = 0;
     f.cadenceSeq = '';
     f.dissonance = min(100, (f.dissonance || 0) + 10);
-  }
-  if (f.cadenceT > 0) f.cadenceT--;
-  else if (f.cadenceStep > 0) {
-    f.cadenceStep = 0;
-    f.cadenceSeq = '';
-    f.tempo = max(0, (f.tempo || 0) - 8);
   }
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
