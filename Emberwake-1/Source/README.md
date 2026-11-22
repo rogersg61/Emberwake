@@ -51,4 +51,4 @@ A new file goes after anything it uses while loading (for example, a `const` bui
 
 ## Publishing on claude.ai
 
-The game also runs as a claude.ai artifact page: publish `Emberwake.html` as its `index.html`. There the page can't reach the internet message boards, so online play (the arena, the battle royale's PLAY ONLINE, and game codes) goes through the page's own live room instead.
+The game also runs as a claude.ai artifact page: publish `Emberwake.html` as its `index.html`. There the page can't reach the internet message boards, so online play (the arena, the battle royale's PLAY ONLINE, and game codes) goes through the page's own live room instead. Outside that artifact, the Cinder Ring uses the same public message-board relay as the game-code connection.

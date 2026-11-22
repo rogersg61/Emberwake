@@ -180,10 +180,10 @@ function drawRingForm(c) {
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
   drawText(c, 'RING', fx, y + 70, '#b9bdd0'); field(c, fx + 46, y + 66, fw - 46, 'code', 'open  (or a private code)');
-  const L = ['Everyone who opens this page on claude.ai and types the', 'same ring code fights together, live. Leave it blank for', 'the open ring. First to 10 takedowns takes the ring.', 'Alone in a ring? Echoes spar with you until someone joins.'];
+  const L = ['Everyone who opens this game and types the same ring code', 'fights together, live. Leave it blank for the open ring.', 'First to 10 takedowns takes the ring.', 'Alone in a ring? Echoes spar with you until someone joins.'];
   L.forEach((l, i) => drawText(c, l, fx, y + 92 + i * 10, '#d8d4e6'));
-  drawText(c, NET.room ? 'Live room: available on this page.' : 'Live room: not reachable here. You can still practice.', fx, y + 136, NET.room ? '#7ddc6f' : '#ffb347');
-  drawText(c, 'Friends need access to this page: share it from claude.ai.', fx, y + 148, '#8b8fa3');
+  drawText(c, NET.room ? 'Live room: available on this page.' : 'Online play uses the internet relay when no live room is available.', fx, y + 136, NET.room ? '#7ddc6f' : '#8b8fa3');
+  drawText(c, 'Use the same ring code and game version to meet your friends.', fx, y + 148, '#8b8fa3');
   button(c, x + 10, y + h - 26, 150, 18, 'ENTER THE RING', () => {
     UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.state = 'loading'; G.loadMsg = 'Entering the ring...';
     setTimeout(() => enterArena(nick, FORM.skin, cleanCode(FORM.code) || 'open'), 30); sfx('quest', 0);

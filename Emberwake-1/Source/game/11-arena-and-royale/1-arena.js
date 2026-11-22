@@ -1,26 +1,38 @@
 // ============================================================
 //  The Cinder Ring, online.
-//  Everyone who has this page open on claude.ai and enters the same
-//  ring code fights in one arena. Each browser simulates its own
-//  Waker and shares it through the page's live room as presence:
+//  Everyone who enters the same ring code fights in one arena. Each
+//  browser simulates its own Waker and shares it through the page's
+//  live room or the public message-board relay as presence:
 //  position, pose, the move in progress, and the hits it landed.
 //  The person who was hit applies the hit (so a perfect dodge on
 //  your screen really dodges). Nothing is stored; closing the page
 //  leaves the ring. Alone in a ring? Echoes spar with you instead.
 // ============================================================
-const NET = { room: null, R: null, status: 'off', code: 'open', me: '', peers: new Map(), seen: new Map(), hitSeq: 0, shotSeq: 0, hits: [], shots: [], rd: 0, roundOver: 0, winner: '', deathN: 0, kb: ['', 0], unsubs: [], joinTok: 0 };
+const NET = { room: null, roomReady: Promise.resolve(), R: null, transport: '', signalPeers: new Map(), sentAt: 0, status: 'off', code: 'open', me: '', peers: new Map(), seen: new Map(), hitSeq: 0, shotSeq: 0, hits: [], shots: [], rd: 0, roundOver: 0, winner: '', deathN: 0, kb: ['', 0], unsubs: [], joinTok: 0 };
 const RING_WEAPONS = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku'], ECHO_WEAPONS = ['sword', 'sword', 'spear', 'spear', 'fangs', 'fangs', 'maul', 'bow', 'nunchaku', 'nunchaku'], SHOT_TYPES = ['arrow', 'bomb', 'knife', 'javelin', 'wave', 'star', 'hook', 'flask', 'pellet'], ARM_SHOTS = ['star', 'hook', 'flask', 'pellet'];
 const KILLS_TO_WIN = 10, ECHO_NAMES = ['ECHO OF ASH', 'ECHO OF GLASS', 'ECHO OF RUST', 'ECHO OF DUSK', 'ECHO OF EMBER', 'ECHO OF MOSS'];
 const num = (v, d = 0) => typeof v === 'number' && isFinite(v) ? v : d;
 const r1 = v => round(v * 10) / 10, r2 = v => round(v * 100) / 100;
 function cleanName(s) { return (typeof s === 'string' ? s : '').toUpperCase().replace(/[^A-Z0-9 _-]/g, '').trim().slice(0, 12); }
 function cleanCode(s) { return (typeof s === 'string' ? s : '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12); }
-function netBoot() { try { if (window.claude && window.claude.use) window.claude.use('room').then(r => { NET.room = r || null; }, () => { }); } catch (e) { } }
+function netBoot() {
+  try { if (window.claude && window.claude.use) NET.roomReady = window.claude.use('room').then(r => { NET.room = r || null; }, () => { NET.room = null; }); }
+  catch (e) { NET.room = null; }
+}
 
 async function netJoin(code) {
   NET.code = code || 'open'; NET.peers.clear(); NET.seen.clear(); NET.me = ''; NET.hits = []; NET.shots = [];
   const tok = ++NET.joinTok;
-  if (!NET.room) { NET.status = 'offline'; return; }
+  NET.transport = ''; NET.signalPeers.clear();
+  await NET.roomReady;
+  if (tok !== NET.joinTok || !WORLD.arena) return;
+  if (!NET.room) {
+    NET.transport = 'signal'; NET.status = 'connecting';
+    NET.me = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    SIG.myId = NET.me; sigStart('cinder-ring:' + NET.code, 'ring', netSignalMessage);
+    return;
+  }
+  NET.transport = 'room';
   NET.status = 'connecting';
   try {
     const R = await NET.room.join('ring-' + NET.code);
@@ -33,8 +45,26 @@ async function netJoin(code) {
 }
 function netLeave() {
   NET.joinTok++; for (const u of NET.unsubs) try { u(); } catch (e) { } NET.unsubs = [];
+  if (NET.transport === 'signal' && SIG.role === 'ring') {
+    sigSend({ t: 'ringLeave', g: NET.me, ring: NET.code });
+    sigStop();
+  }
   if (NET.R) { try { NET.R.leave().catch(() => { }); } catch (e) { } } NET.R = null; NET.status = 'off';
+  NET.transport = ''; NET.signalPeers.clear();
   for (const f of NET.peers.values()) f.gone = true; NET.peers.clear(); G.fighters = G.fighters.filter(f => !f.gone);
+}
+function netSignalMessage(m) {
+  if (NET.transport !== 'signal' || !m || typeof m.g !== 'string' || m.g === NET.me || m.ring !== NET.code) return;
+  if (m.t === 'ringLeave') NET.signalPeers.delete(m.g);
+  else if (m.t === 'ring' && m.p && typeof m.p === 'object' && m.p.ring === NET.code) NET.signalPeers.set(m.g, { presence: m.p, at: performance.now() });
+}
+function netSignalRefresh(now) {
+  const peers = [];
+  for (const [id, q] of NET.signalPeers) {
+    if (now - q.at > 4000) NET.signalPeers.delete(id);
+    else peers.push({ peer: id, presence: q.presence, kind: 'viewer', guest: false });
+  }
+  netPeers(peers);
 }
 function netPeers(list) {
   if (BR.on) return brPeers(list);
@@ -101,19 +131,29 @@ function netDeathSeen(victim, killerPeer) {
 }
 function netHit(target, dmg, kx, ky, crit, extra, by) { const h = [target.peer, ++NET.hitSeq, round(dmg), r1(kx), r1(ky), crit ? 1 : 0, extra || 0]; if (by && by.brBot && !by.remote) h.push(by.botTag); NET.hits.push(h); if (NET.hits.length > 10) NET.hits.shift(); }
 function netShot(pr) {
-  if (!WORLD.arena || !NET.R) return; const k = SHOT_TYPES.indexOf(pr.type); if (k < 0) return;
+  if (!WORLD.arena || (!NET.R && NET.transport !== 'signal')) return; const k = SHOT_TYPES.indexOf(pr.type); if (k < 0) return;
   NET.shots.push([++NET.shotSeq, k, r1(pr.x), r1(pr.y), r2(pr.vx), r2(pr.vy), round(pr.g * 1000) / 1000, pr.boom | 0, pr.owner && pr.owner.brBot ? pr.owner.botTag : 0]); if (NET.shots.length > 6) NET.shots.shift();
 }
-function netSend() {
-  if (BR.on) return brSend();
-  const R = NET.R; if (!R || !R.connected()) return;
+function netPresence() {
   const p = G.p, a = p.atk, W = heldOf(p);
-  R.presence({
+  return {
     v: 1, ring: NET.code, n: G.nick, sk: G.skin, w: W && RING_WEAPONS.includes(W.id) ? W.id : 'sword', x: r1(p.x), y: r1(p.y), vx: r2(p.vx), vy: r2(p.vy), f: p.face, g: p.onGround ? 1 : 0,
     st: p.dead ? 4 : p.state === 'dodge' ? 2 : p.hurtT > 0 ? 3 : a ? 1 : 0, dd: p.dodgeDir, hp: max(0, round(p.hp)), k: p.kills, d: p.deaths, rd: NET.rd,
     m: a ? a.id : '', an: p.atkN, mp: a ? a.phase : 0, mt: a ? a.pt : 0, ma: a ? r2(a.aimA) : 0, md: a ? round(a.dist) : 0, mc: a ? a.charge : 0, mf: a ? a.face : p.face, rp: p.riposte > 0 ? 1 : 0, sp: p.inv > 30 ? 1 : 0,
     hs: NET.hits, ps: NET.shots, kb: NET.kb, sx: p.st ? [p.st.pin > 0 ? (p.st.pinS || 0) + 2 : 0, p.st.burn > 0 ? 1 : 0, p.st.blind > 0 ? 1 : 0, p.st.hook > 0 || p.st.reel > 0 ? 1 : 0] : 0, lk: p.state === 'link' ? 1 : 0
-  }).catch(() => { });
+  };
+}
+function netSend() {
+  if (BR.on) return brSend();
+  if (NET.transport === 'signal') {
+    const now = performance.now(); if (now - NET.sentAt < 100) return; NET.sentAt = now;
+    sigSend({ t: 'ring', g: NET.me, ring: NET.code, p: netPresence() });
+    NET.status = SIG.conns.some(C => C.ok) ? 'online' : performance.now() - SIG.startT > 9000 ? 'offline' : 'connecting';
+    netSignalRefresh(now);
+    return;
+  }
+  const R = NET.R; if (!R || !R.connected()) return;
+  R.presence(netPresence()).catch(() => { });
 }
 // replay another person's Waker, about a tenth of a second behind, so motion is smooth
 function tickRemote(f) {

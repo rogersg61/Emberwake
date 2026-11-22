@@ -231,6 +231,7 @@ function sigTick() {
   sigKeep(now); if (SIG.conns.some(C => C.ok)) SIG.everOk = true;
   if (COOP.peers.size) rlyTick(now);
   if (SIG.room && SIG.roomDirty && now - (SIG.roomT || 0) > RLY_ROOM.ms) sigRoomPush();
+  if (SIG.role === 'ring') return;
   if (SIG.role === 'host') {
     if (now - SIG.sayT > 2000) { SIG.sayT = now; const n = [...COOP.peers.values()].filter(P => P.ok).length; sigSend({ t: 'host', n: coopName(), mode: SIG.mode || 'world', w: SIG.mode === 'br' ? '' : WORLD.name, v: NETV, gv: GAME_VERSION, full: n >= MAXG ? 1 : 0 }); }
     for (const [g, P] of SIG.guests) if (COOP.peers.get(P.id) !== P && !P.ok && now - P.connT > 30000) SIG.guests.delete(g);
