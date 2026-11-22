@@ -268,12 +268,29 @@ function noteMove(f, setName, id, m, fresh) {
 }
 function startAttack(f, btn, I, force) {
   const W = heldOf(f); if (!W || W.type !== 'weapon') return false;
+  if (f.isPlayer && (f.snapped || 0) > 0) {
+    sfx('deny');
+    if (f === G.p) numPop(f.x + 3, f.y - 12, 'SNAPPED', '#e2483b', .8);
+    f.stamDelay = 18;
+    return false;
+  }
   if (!force && tryLink(f, btn)) return true;
   const set = MOVESETS[W.set], c = atkContext(f, I); let id = force || resolveMove(set, btn, c); if (!force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
-  if (force) { if (m.cost) { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
+  if (f.isPlayer) {
+    if (f.lastMove === id) {
+      f.dissonance = min(100, (f.dissonance || 0) + 7);
+      f.fray = min(100, (f.fray || 0) + 5);
+    } else {
+      f.dissonance = max(0, (f.dissonance || 0) - 3);
+    }
+  }
+  if (force) { if (m.cost) { const fray = f.isPlayer ? (f.fray || 0) : 0, rush = (f.atkTiming || 'normal') === 'rushed'; const cost = round(m.cost * (1 + (fray >= 70 ? .5 : fray >= 40 ? .25 : 0) + (rush ? .35 : 0))); f.stam = max(0, f.stam - cost); f.stamDelay = 42; } }
   else if (m.rise && c.air) { if (!f.updraft) { id = btn === 'L' ? set.map.aChain[0] : set.map.ha; m = set.moves[id]; } else f.updraft = false; }
-  if (!force && m.cost) { if (f.stam < m.cost * .6) { if (f === G.p) sfx('deny'); id = resolveMove(set, 'L', c); if (f === G.p) id = famGate(W.set, set, id, 'L', c); m = set.moves[id]; if (m.rise && c.air) { id = set.map.aChain[0]; m = set.moves[id]; } } else { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
+  if (!force && m.cost) {
+    if (f.stam < m.cost * .6) { if (f === G.p) sfx('deny'); id = resolveMove(set, 'L', c); if (f === G.p) id = famGate(W.set, set, id, 'L', c); m = set.moves[id]; if (m.rise && c.air) { id = set.map.aChain[0]; m = set.moves[id]; } }
+    else { const fray = f.isPlayer ? (f.fray || 0) : 0, rush = (f.atkTiming || 'normal') === 'rushed'; const cost = round(m.cost * (1 + (fray >= 70 ? .5 : fray >= 40 ? .25 : 0) + (rush ? .35 : 0))); f.stam = max(0, f.stam - cost); f.stamDelay = 42; }
+  }
   const rep = f.hist.slice(-4).filter(h => h === id).length, fresh = !f.hist.slice(-3).includes(id);
   f.hist.push(id); if (f.hist.length > 8) f.hist.shift();
   f.face = c.side; f.state = 'attack'; f.chainT = 0; f.mineP = 0;
@@ -282,8 +299,11 @@ function startAttack(f, btn, I, force) {
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
-  const timingMul = timing === 'perfect' ? 1.28 : timing === 'rushed' ? .72 : timing === 'steady' ? 1.1 : 1;
-  a.gm = (a.gm || 1) * timingMul;
+  const timingMul = timing === 'perfect' ? 1.38 : timing === 'rushed' ? .58 : timing === 'steady' ? 1.16 : 1;
+  const tempoTier = f.isPlayer ? ((f.tempo || 0) >= 100 ? 3 : (f.tempo || 0) >= 65 ? 2 : (f.tempo || 0) >= 35 ? 1 : 0) : 0;
+  const tempoMul = f.isPlayer ? [1, 1.04, 1.1, 1.18][tempoTier] : 1;
+  const snappedMul = f.isPlayer && f.snapped > 0 ? .62 : 1;
+  a.gm = (a.gm || 1) * timingMul * tempoMul * snappedMul;
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -421,6 +441,73 @@ function reflectProj(pr, a) {
   fsx(a.f, 'reflect'); sparks(pr.x, pr.y, 10); numPop(pr.x, pr.y - 6, 'DEFLECT', '#8ff5e6'); if (a.f === G.p) { G.hitstop = max(G.hitstop, 3); comboHit(true); }
 }
 function comboHit(fresh) { const c = G.combo; c.n++; c.t = 180; c.pts += fresh ? 3 : 1; }
+const CADENCE = {
+  sword: ['L', 'L', 'H'],
+  spear: ['L', 'H', 'L', 'H'],
+  fangs: ['L', 'L', 'L', 'H'],
+  maul: ['H', 'L', 'H'],
+  bow: ['L', 'H', 'L'],
+  chuks: ['L', 'L', 'H'],
+  brawl: ['L', 'H', 'L', 'H']
+};
+function combatTempoHit(f, a, e) {
+  if (!f.isPlayer || f.snapped > 0) return;
+  const timing = a.timing || 'normal';
+  if (f.repeatMove === a.id && f.tempoT > 0) f.repeatCount = min(5, (f.repeatCount || 0) + 1);
+  else { f.repeatMove = a.id; f.repeatCount = 1; }
+  f.tempoT = 150;
+  const pattern = CADENCE[a.setName] || CADENCE.sword;
+  const step = f.cadenceStep || 0;
+  if (a.btn === pattern[step % pattern.length]) {
+    f.cadenceStep = step + 1;
+    f.cadenceSeq = (f.cadenceSeq || '') + a.btn;
+    f.cadenceT = 180;
+    f.dissonance = max(0, (f.dissonance || 0) - 8);
+    if (f.cadenceStep >= pattern.length) {
+      f.cadenceStep = 0;
+      f.cadenceSeq = '';
+      f.cadencePhrase = (f.cadencePhrase || 0) + 1;
+      f.tempo = min(100, (f.tempo || 0) + 30);
+      f.fray = max(0, (f.fray || 0) - 28);
+      f.dissonance = max(0, (f.dissonance || 0) - 45);
+      f.stam = min(f.maxstam, f.stam + 8);
+      numPop(f.x + 3, f.y - 18, 'PHRASE COMPLETE', '#ffd35a', .9);
+      sparks(f.x + 3, f.y + 6, 12, f.face, 2.2, ['#ffd35a', '#fff1a8', '#8ff5e6']);
+      sfx('newmove', 0);
+    }
+  } else {
+    f.cadenceStep = a.btn === pattern[0] ? 1 : 0;
+    f.cadenceSeq = f.cadenceStep ? a.btn : '';
+    f.cadenceT = 180;
+    f.dissonance = min(100, (f.dissonance || 0) + 18);
+    f.fray = min(100, (f.fray || 0) + 8);
+  }
+  if (timing === 'rushed') {
+    f.fray = min(100, (f.fray || 0) + 24);
+    f.tempo = max(0, (f.tempo || 0) - 8);
+  } else if (timing === 'perfect') {
+    f.fray = max(0, (f.fray || 0) - 18);
+    f.tempo = min(100, (f.tempo || 0) + 28);
+  } else if (timing === 'steady') {
+    f.fray = max(0, (f.fray || 0) - 12);
+    f.tempo = min(100, (f.tempo || 0) + 18);
+  } else {
+    f.fray = max(0, (f.fray || 0) - 4);
+    f.tempo = min(100, (f.tempo || 0) + 9);
+  }
+  if (f.repeatCount >= 2) {
+    f.fray = min(100, (f.fray || 0) + 12 * (f.repeatCount - 1));
+    f.tempo = max(0, (f.tempo || 0) - 5 * (f.repeatCount - 1));
+  }
+  if (f.fray >= 100 || (f.dissonance || 0) >= 100) {
+    f.fray = 100; f.dissonance = 100; f.tempo = max(0, f.tempo - 35); f.snapped = 120;
+    f.stam = max(0, f.stam - 18); f.stamDelay = 70;
+    numPop(f.x + 3, f.y - 14, 'TEMPO SNAPPED', '#e2483b', .9);
+    sparks(f.x + 3, f.y + 8, 16, f.face, 2.2, ['#e2483b', '#ff9a8a', '#ffd35a']);
+    sfx('deny', 0);
+  }
+  if (f.tempo >= 100 && !e.dead) f.stam = min(f.maxstam, f.stam + 2);
+}
 function hitFx(hx, hy, top, dmg, o, kx, involved) {
   numPop(hx, top - 4, dmg, o.crit ? '#ffd35a' : '#ffffff', o.crit ? 2 : 1); sparks(hx, hy, o.crit ? 12 : 6, sign(kx), 2.4, o.cold ? FROST : SPARK); if (o.blunt) dust(hx, hy, 4);
   G.trails.push({ kind: 'hit', x: hx, y: hy, life: 5, max: 5, a: frand(TAU), big: o.crit || o.stop >= 5 });
@@ -446,6 +533,7 @@ function applyHit(a, e, hx, hy) {
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
   if (!strike(f, e, dmg, kx, m.kb[1], { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  if (P0) combatTempoHit(f, a, e);
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }

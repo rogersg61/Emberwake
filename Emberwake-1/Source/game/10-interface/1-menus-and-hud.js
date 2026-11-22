@@ -120,6 +120,27 @@ function itemTip(it) {
   const u = USES[it.id]; if (u && u.length) for (const l of wrapText('Used for: ' + u.slice(0, 6).join(', ') + (u.length > 6 ? `, +${u.length - 6} more` : ''), 150)) L.push([l, '#8ff5e6']);
   return L;
 }
+function drawTempoHud(c) {
+  const p = G.p;
+  if (!p) return;
+  const tempo = clamp(p.tempo || 0, 0, 100), fray = clamp(p.fray || 0, 0, 100), snapped = (p.snapped || 0) > 0;
+  const tier = tempo >= 100 ? 3 : tempo >= 65 ? 2 : tempo >= 35 ? 1 : 0;
+  const name = snapped ? 'SNAPPED' : tier === 3 ? 'TEMPO : ASHEN' : tier === 2 ? 'TEMPO : KINDLED' : tier === 1 ? 'TEMPO : PULSE' : 'TEMPO';
+  const col = snapped ? '#e2483b' : tier >= 2 ? '#ffd35a' : tier === 1 ? '#8ff5e6' : '#b9bdd0';
+  textS(c, name, 15, 37, col);
+  c.fillStyle = '#2b2740'; c.fillRect(15, 46, 72, 3);
+  c.fillStyle = snapped ? '#e2483b' : col; c.fillRect(15, 46, round(72 * tempo / 100), 3);
+  c.fillStyle = '#2b2740'; c.fillRect(15, 51, 72, 2);
+  c.fillStyle = fray >= 70 ? '#ff6b6b' : fray >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * max(fray, p.dissonance || 0) / 100), 2);
+  const W = heldItem();
+  if (W && W.type === 'weapon') {
+    const pattern = { sword: ['L', 'L', 'H'], spear: ['L', 'H', 'L', 'H'], fangs: ['L', 'L', 'L', 'H'], maul: ['H', 'L', 'H'], bow: ['L', 'H', 'L'], chuks: ['L', 'L', 'H'], brawl: ['L', 'H', 'L', 'H'] }[W.set] || ['L', 'L', 'H'];
+    let phrase = '';
+    for (let i = 0; i < pattern.length; i++) phrase += i === (p.cadenceStep || 0) % pattern.length && (p.cadenceStep || 0) < pattern.length ? '[' + pattern[i] + '] ' : pattern[i] + ' ';
+    textS(c, 'PHRASE ' + phrase.trim(), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+  }
+  if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
+}
 function fmtTime(s) { s = s | 0; const h = (s / 3600) | 0, m = ((s % 3600) / 60) | 0; return h ? `${h}h ${m}m` : `${m}m`; }
 
 // ---------------- menus ----------------
@@ -391,6 +412,7 @@ function drawRingForm(c) {
 function drawHUD(c) {
   const p = G.p, uw = VS.uw, uh = VS.uh, A = WORLD.arena;
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
+  if (!A) drawTempoHud(c);
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (p.atk && p.atk.phase === 2) {

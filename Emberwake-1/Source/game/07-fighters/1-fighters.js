@@ -21,7 +21,9 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
-    kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal'
+    kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
+    tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
+    cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -92,6 +94,23 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.snapped > 0) f.snapped--;
+  if (f.tempoT > 0) f.tempoT--;
+  if (f.tempoT <= 0) f.tempo = max(0, (f.tempo || 0) - .12);
+  f.fray = max(0, (f.fray || 0) - (f.snapped > 0 ? .12 : .38));
+  f.dissonance = max(0, (f.dissonance || 0) - (f.snapped > 0 ? .08 : .28));
+  if (f.cadenceT > 0) f.cadenceT--;
+  else if (f.cadenceStep > 0) {
+    f.cadenceStep = 0;
+    f.cadenceSeq = '';
+    f.dissonance = min(100, (f.dissonance || 0) + 10);
+  }
+  if (f.cadenceT > 0) f.cadenceT--;
+  else if (f.cadenceStep > 0) {
+    f.cadenceStep = 0;
+    f.cadenceSeq = '';
+    f.tempo = max(0, (f.tempo || 0) - 8);
+  }
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
   if (f.attackInputCd > 0) f.attackInputCd--;
@@ -117,14 +136,18 @@ function tickFighter(f, I) {
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
           const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
           const prog = clamp(f.atk.pt / rec, 0, 1);
+          const set = f.atk.W.set;
+          const window = set === 'maul' ? [.70, .84] : set === 'fangs' ? [.74, .94] : set === 'bow' ? [.80, .96] : set === 'chuks' ? [.76, .92] : [.78, .92];
           if (prog >= .68) {
-            f.atkTiming = prog >= .78 && prog <= .92 ? 'perfect' : 'steady';
+            f.atkTiming = prog >= window[0] && prog <= window[1] ? 'perfect' : 'steady';
             f.buf = { b, t: 10 };
             f.attackInputCd = 8;
             if (f === G.p) numPop(f.x + 3, f.y - 12, f.atkTiming === 'perfect' ? 'PERFECT' : 'TIMED', f.atkTiming === 'perfect' ? '#ffd35a' : '#7ddc6f');
           } else {
             f.atkTiming = 'rushed';
             f.attackInputCd = 18;
+            f.fray = min(100, (f.fray || 0) + 8);
+            f.tempo = max(0, (f.tempo || 0) - 3);
             if (f === G.p) numPop(f.x + 3, f.y - 12, 'WAIT', '#ff8a3d');
           }
         }
