@@ -5488,7 +5488,7 @@ function oreSeekerFx() {
 const ARM = 6.5;
 // player settings, kept between sessions on this computer
 const DIFFS = { easy: { n: 'EASY', taken: .7, regen: 2, hunger: .7 }, normal: { n: 'NORMAL', taken: 1, regen: 1, hunger: 1 }, hard: { n: 'HARD', taken: 1.25, regen: .6, hunger: 1.2 } };
-const SETTINGS = (() => { const d = { combat: 'simple', diff: 'easy', craft: 'simple', fpsMode: false }; try { return Object.assign(d, JSON.parse(localStorage.getItem('ew_settings') || '{}')); } catch (e) { return d; } })();
+const SETTINGS = (() => { const d = { combat: 'simple', diff: 'easy', craft: 'simple', fpsMode: false, fpsQuality: 65 }; try { const saved = JSON.parse(localStorage.getItem('ew_settings') || '{}'); const out = Object.assign(d, saved); if (typeof out.fpsQuality !== 'number') out.fpsQuality = out.fpsMode ? 25 : 65; return out; } catch (e) { return d; } })();
 const saveSettings = () => { try { localStorage.setItem('ew_settings', JSON.stringify(SETTINGS)); } catch (e) { } };
 const DIFF = () => DIFFS[SETTINGS.diff] || DIFFS.easy;
 const mv = (name, btn, hint, o) => Object.assign({ name, btn, hint, kind: 'swing', wind: 4, act: 5, rec: 10, dmg: 1, kb: [1.4, -.6], reach: 1, stop: 2, shake: 1, cost: 0, aimed: 18, center: 0, ctrl: .3 }, o);
@@ -9001,7 +9001,7 @@ function eventSun() {
 //  a hit box while it draws; clicks test last frame's boxes.
 // ============================================================
 const inR = (x, y, w, h) => mouse.ux >= x && mouse.ux < x + w && mouse.uy >= y && mouse.uy < y + h;
-const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', friendName: '', friendCode: '', accountName: '', accountPassword: '', accountConfirm: '' };
+const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', duelMode: 0, friendName: '', friendCode: '', accountName: '', accountPassword: '', accountConfirm: '' };
 const SIZE_D = ['600 x 260 tiles', '900 x 320 tiles', '1400 x 380 tiles', '2200 x 440 tiles: days to cross'], SHAPE_D = ['every seed deals its lands in a new order', 'the Drift is crowded with islands', 'few islands, the Underdark yawns wider'], MODE_D = ['three embers, any order, nothing forced', 'every item, no monsters, build freely'];
 let HITS = [], HITS_NEXT = [];
 const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!slot });
@@ -9127,16 +9127,14 @@ function drawLogo(c, cy, sub) {
 }
 function drawTitle(c) {
   const uw = VS.uw, uh = VS.uh; c.fillStyle = 'rgba(18,13,31,.38)'; c.fillRect(0, 0, uw, uh);
-  drawLogo(c, round(uh * .16), 'THREE EMBERS : GO ANYWHERE');
-  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .28), gap = 16, bh = 15;
-  button(c, bx, by, bw, bh, 'WORLDS', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
-  button(c, bx, by + gap, bw, bh, 'JOIN A FRIEND', () => { G.state = 'join'; UI.focus = null; COOP.err = ''; COOP.note = ''; COOP.long = false; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
-  button(c, bx, by + gap * 2, bw, bh, 'THE CINDER RING : ONLINE PVP', () => { G.state = 'ring'; UI.focus = null; if (!FORM.nick) FORM.nick = 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
-  button(c, bx, by + gap * 3, bw, bh, 'THE ASHFALL : BATTLE ROYALE', () => { G.state = 'brform'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); if (FORM.brcode === undefined) FORM.brcode = ''; sfx('ui'); });
-  button(c, bx, by + gap * 4, bw, bh, 'ACCOUNT: ' + (ACCOUNT.active ? ACCOUNT.active.name.toUpperCase().slice(0, 16) : 'GUEST'), () => { G.state = 'accounts'; ACCOUNT.note = ''; UI.focus = null; sfx('ui'); });
-  button(c, bx, by + gap * 5, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
-  button(c, bx, by + gap * 6, bw, bh, 'CUSTOMIZATION + ACHIEVEMENTS', () => { G.state = 'customize'; UI.customTab = 'shop'; UI.scroll = 0; ACCOUNT.note = ''; sfx('ui'); });
-  button(c, bx, by + gap * 7, bw, bh, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
+  drawLogo(c, round(uh * .14), 'BUILD. EXPLORE. FIGHT.');
+  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .31), gap = 18, bh = 20;
+  button(c, bx, by, bw, bh, 'SINGLEPLAYER', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
+  button(c, bx, by + gap, bw, bh, 'MULTIPLAYER', () => { G.state = 'multiplayer'; UI.focus = null; sfx('ui'); });
+  button(c, bx, by + gap * 3, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
+  button(c, bx, by + gap * 4, bw, bh, 'SHOP + ACHIEVEMENTS', () => { G.state = 'customize'; UI.customTab = 'shop'; UI.scroll = 0; ACCOUNT.note = ''; sfx('ui'); });
+  button(c, bx, by + gap * 5, bw, bh, 'SETTINGS', () => { G.state = 'settings'; UI.focus = null; sfx('ui'); });
+  button(c, bx, by + gap * 6, bw, bh, 'ACCOUNT: ' + (ACCOUNT.active ? ACCOUNT.active.name.toUpperCase().slice(0, 16) : 'GUEST'), () => { G.state = 'accounts'; ACCOUNT.note = ''; UI.focus = null; sfx('ui'); });
   textC(c, 'build, explore, and fight with every form', uw / 2, uh - 26, '#d8d4e6', 1, textO);
   textC(c, 'mouse + keyboard', uw / 2, uh - 15, '#8b8fa3', 1, textO);
   const vs = 'version ' + GAME_VERSION; textS(c, vs, uw - textW(vs) - 4, uh - 10, '#6a6485');
@@ -9166,7 +9164,8 @@ function drawCustomization(c) {
     } else {
       const owned = cosmeticOwned(item.type, item.id), equipped = ACCOUNT.active[item.type] === item.id;
       const label = item.type === 'skin' ? 'SKIN ' + (item.id + 1) : 'HAT';
-      drawText(c, label + ': ' + item.name, x + 10, ry + 6, equipped ? '#ffd35a' : '#fff');
+      if (item.type === 'skin' && SK[clamp(item.id, 0, SK.length - 1)]) { const head = SK[clamp(item.id, 0, SK.length - 1)].head; c.drawImage(head, x + 10, ry + 2, 14, 14); drawText(c, label + ': ' + item.name, x + 28, ry + 6, equipped ? '#ffd35a' : '#fff'); }
+      else { c.fillStyle = item.id ? '#ffd35a' : '#6a6485'; c.fillRect(x + 12, ry + 5, 10, 7); drawText(c, label + ': ' + item.name, x + 28, ry + 6, equipped ? '#ffd35a' : '#fff'); }
       if (owned) button(c, x + w - 68, ry + 2, 58, 14, equipped ? 'EQUIPPED' : 'EQUIP', () => cosmeticEquip(item.type, item.id), { off: equipped });
       else button(c, x + w - 68, ry + 2, 58, 14, 'BUY ' + item.price, () => cosmeticBuy(item.type, item.id), { off: coins < item.price });
     }
@@ -9322,20 +9321,56 @@ function drawAccounts(c) {
   }
   if (ACCOUNT.note) textC(c, ACCOUNT.note, uw / 2, y + h - 3, '#8ff5e6', 1, textO);
 }
+function drawMultiplayer(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(220, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'MULTIPLAYER');
+  const fx = x + 10, fw = w - 20, by = y + 28;
+  drawText(c, 'PLAY TOGETHER', fx, by - 10, '#8ff5e6');
+  button(c, fx, by, fw, 17, 'JOIN A WORLD', () => { G.state = 'join'; UI.focus = null; COOP.err = ''; COOP.note = ''; COOP.long = false; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER'; sfx('ui'); });
+  drawText(c, 'Join a friend with a six-character world code.', fx, by + 21, '#d8d4e6');
+  button(c, fx, by + 38, fw, 17, 'THE ASHFALL : BATTLE ROYALE', () => { G.state = 'brform'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER'; if (FORM.brcode === undefined) FORM.brcode = ''; sfx('ui'); });
+  drawText(c, 'Survive the storm alone or with friends.', fx, by + 59, '#d8d4e6');
+  button(c, fx, by + 76, fw, 17, 'DUELS : FIND A MATCH', () => { G.state = 'ring'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER'; sfx('ui'); });
+  drawText(c, 'Choose a mode, join the queue, and get paired automatically.', fx, by + 97, '#d8d4e6');
+  button(c, x + w - 70, y + h - 22, 60, 15, 'BACK', () => { G.state = 'title'; UI.focus = null; sfx('ui'); });
+}
+function drawSettings(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(232, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'SETTINGS');
+  const fx = x + 12, fw = w - 24;
+  drawText(c, 'COMBAT', fx, y + 28, '#ffd35a');
+  button(c, fx, y + 36, fw, 16, 'CONTROLS: ' + (SETTINGS.combat === 'simple' ? 'SIMPLE' : 'FULL'), () => { SETTINGS.combat = SETTINGS.combat === 'simple' ? 'full' : 'simple'; saveSettings(); sfx('ui'); });
+  drawText(c, 'CRAFTING', fx, y + 66, '#ffd35a');
+  button(c, fx, y + 74, fw, 16, 'MODE: ' + (SETTINGS.craft === 'hands' ? 'HANDS-ON' : 'SIMPLIFIED'), () => { SETTINGS.craft = SETTINGS.craft === 'hands' ? 'simple' : 'hands'; saveSettings(); UI.job = null; sfx('ui'); });
+  drawText(c, 'WORLD DIFFICULTY', fx, y + 104, '#ffd35a');
+  button(c, fx, y + 112, fw, 16, 'DIFFICULTY: ' + DIFF().n.toUpperCase(), () => { SETTINGS.diff = SETTINGS.diff === 'easy' ? 'normal' : SETTINGS.diff === 'normal' ? 'hard' : 'easy'; saveSettings(); sfx('ui'); });
+  drawText(c, 'PERFORMANCE', fx, y + 142, '#ffd35a');
+  drawText(c, 'Performance', fx, y + 154, '#8b8fa3'); drawText(c, 'Balanced', fx + fw / 2 - 20, y + 154, '#8b8fa3'); drawText(c, 'Quality', fx + fw - 36, y + 154, '#8b8fa3');
+  const sx = fx, sy = y + 166, sw = fw, sh = 8;
+  c.fillStyle = '#3d3a52'; c.fillRect(sx, sy + 3, sw, 3); c.fillStyle = SETTINGS.fpsQuality < 35 ? '#ffb347' : SETTINGS.fpsQuality > 75 ? '#8ff5e6' : '#7ddc6f'; c.fillRect(sx, sy + 3, clamp(sw * SETTINGS.fpsQuality / 100, 4, sw), 3);
+  c.fillStyle = '#fff1a8'; c.fillRect(sx + clamp(sw * SETTINGS.fpsQuality / 100, 4, sw) - 3, sy, 6, 10);
+  hit(sx, sy - 4, sw, 18, b => { const r = inR(sx, sy - 4, sw, 18); if (b === 0 && r) { SETTINGS.fpsQuality = clamp(Math.round((mouse.ux - sx) / sw * 100), 0, 100); SETTINGS.fpsMode = SETTINGS.fpsQuality < 35; if (SETTINGS.fpsMode) G.parts.length = 0; saveSettings(); sfx('ui'); } });
+  drawText(c, SETTINGS.fpsQuality < 35 ? 'High FPS for low-end devices' : SETTINGS.fpsQuality > 75 ? 'More effects and detail' : 'Balanced frame rate and detail', fx, y + 185, SETTINGS.fpsQuality < 35 ? '#ffb347' : '#d8d4e6');
+  button(c, fx, y + h - 22, fw, 15, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
+  button(c, x + w - 70, y + h - 44, 60, 15, 'BACK', () => { G.state = 'title'; UI.focus = null; sfx('ui'); });
+}
 function drawRingForm(c) {
   const uw = VS.uw, uh = VS.uh, w = min(330, uw - 16), h = 214, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
-  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'THE CINDER RING : ONLINE PVP');
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'DUEL MATCHMAKING');
   const fx = x + 10, fw = w - 20;
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
-  drawText(c, 'RING', fx, y + 70, '#b9bdd0'); field(c, fx + 46, y + 66, fw - 46, 'code', 'open  (or a private code)');
-  const L = ['Everyone who opens this game and types the same ring code', 'fights together, live. Leave it blank for the open ring.', 'First to 10 takedowns takes the ring.', 'Alone in a ring? Echoes spar with you until someone joins.'];
-  L.forEach((l, i) => drawText(c, l, fx, y + 92 + i * 10, '#d8d4e6'));
-  drawText(c, NET.room ? 'Live room: available on this page.' : 'Online play uses the internet relay when no live room is available.', fx, y + 136, NET.room ? '#7ddc6f' : '#8b8fa3');
-  drawText(c, 'Use the same ring code and game version to meet your friends.', fx, y + 148, '#8b8fa3');
-  button(c, x + 10, y + h - 26, 150, 18, 'ENTER THE RING', () => {
-    UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.state = 'loading'; G.loadMsg = 'Entering the ring...';
-    setTimeout(() => enterArena(nick, FORM.skin, cleanCode(FORM.code) || 'open'), 30); sfx('quest', 0);
+  drawText(c, 'MODE', fx, y + 70, '#b9bdd0');
+  const modes = ['DUEL 1V1', 'QUICK SKIRMISH', 'FREE FOR ALL'];
+  modes.forEach((name, i) => button(c, fx + i * (fw / 3), y + 66, fw / 3 - 2, 16, name, () => { FORM.duelMode = i; sfx('ui'); }, { on: FORM.duelMode === i }));
+  const descriptions = ['First player to 10 takedowns wins.', 'Short match: paired opponents, fast respawns.', 'Every Waker fights every other Waker.'];
+  drawText(c, descriptions[FORM.duelMode], fx, y + 92, '#d8d4e6');
+  drawText(c, NET.room ? 'Automatic matchmaking available here.' : 'Automatic matchmaking uses the online relay.', fx, y + 108, NET.room ? '#7ddc6f' : '#8b8fa3');
+  drawText(c, 'Waiting for a suitable player. Echoes fill a practice match.', fx, y + 120, '#b9bdd0');
+  button(c, x + 10, y + h - 26, 150, 18, 'JOIN QUEUE', () => {
+    UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.state = 'loading'; G.loadMsg = 'Finding a duel...';
+    const queueCode = 'duel-' + (['1v1', 'quick', 'ffa'][FORM.duelMode] || '1v1');
+    setTimeout(() => enterArena(nick, FORM.skin, queueCode), 30); sfx('quest', 0);
   });
   button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { G.state = 'title'; UI.focus = null; sfx('ui'); });
 }
@@ -9431,7 +9466,7 @@ function drawKillFeed(c) {
 }
 function drawScore(c) {
   const uw = VS.uw, uh = VS.uh, list = [...G.fighters].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths), w = min(260, uw - 16), h = 34 + list.length * 11, x = round((uw - w) / 2), y = round((uh - h) / 2) - 10;
-  panel(c, x, y, w, h, `THE CINDER RING : ${NET.code.toUpperCase()} : ROUND ${NET.rd + 1}`);
+  panel(c, x, y, w, h, `DUEL : ${NET.code.toUpperCase()} : ROUND ${NET.rd + 1}`);
   drawText(c, 'WAKER', x + 8, y + 16, '#8b8fa3'); drawText(c, 'TAKEDOWNS', x + w - 110, y + 16, '#8b8fa3'); drawText(c, 'FALLS', x + w - 44, y + 16, '#8b8fa3');
   list.forEach((f, i) => { const yy = y + 28 + i * 11, me = f === G.p; if (me) { c.fillStyle = '#2b2740'; c.fillRect(x + 4, yy - 2, w - 8, 10); } drawText(c, f.name + (f.echoBot ? '  (echo)' : f.remote ? '' : '  (you)'), x + 8, yy, me ? '#ffd35a' : f.echoBot ? '#b9bdd0' : '#8ff5e6'); drawText(c, String(f.kills), x + w - 80, yy, '#fff'); drawText(c, String(f.deaths), x + w - 34, yy, '#fff'); });
   drawText(c, ringStatusText(), x + 8, y + h - 10, '#7ddc6f');
@@ -9525,16 +9560,16 @@ function drawJournal(c) {
 }
 function drawPause(c) {
   const A = WORLD.arena, w = min(A ? 340 : 392, VS.uw - 16), h = A ? 158 : 240, x = round((VS.uw - w) / 2), y = round((VS.uh - h) / 2);
-  panel(c, x, y, w, h, A ? (WORLD.royale ? 'THE ASHFALL : MENU' : 'THE CINDER RING : MENU') : `${WORLD.name.toUpperCase()} : PAUSED`); hit(x, y, w, h, () => { });
+  panel(c, x, y, w, h, A ? (WORLD.royale ? 'THE ASHFALL : MENU' : 'DUEL : MENU') : `${WORLD.name.toUpperCase()} : PAUSED`); hit(x, y, w, h, () => { });
   button(c, x + 8, y + 18, 70, 15, 'RESUME', () => { closeUI(); sfx('ui'); });
-  button(c, x + 84, y + 18, 96, 15, A ? (WORLD.royale ? (BR.via !== 'solo' ? 'TO THE LOBBY' : 'LEAVE MATCH') : 'LEAVE RING') : 'SAVE & QUIT', () => { closeUI(); if (WORLD.royale && BR.on && BR.via !== 'solo') brBackToLobby(); else quitToTitle(); sfx('ui'); });
+  button(c, x + 84, y + 18, 96, 15, A ? (WORLD.royale ? (BR.via !== 'solo' ? 'TO THE LOBBY' : 'LEAVE MATCH') : 'LEAVE DUEL') : 'SAVE & QUIT', () => { closeUI(); if (WORLD.royale && BR.on && BR.via !== 'solo') brBackToLobby(); else quitToTitle(); sfx('ui'); });
   button(c, x + 186, y + 18, 84, 15, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
   if (!A) button(c, x + 276, y + 18, 56, 15, 'SAVE', () => { saveWorld(); sfx('craft'); });
   if (!A && G.p && !G.boss && !G.duel) button(c, x + w - 112, y + h - 19, 104, 13, 'WAKE AT THE FIRE', () => { closeUI(); wakeAtFire(); });
   if (!A) button(c, x + w - 112, y + h - 36, 104, 13, netGuest() ? 'LEAVE THEIR WORLD' : COOP.role ? 'PLAY TOGETHER (' + (1 + [...COOP.peers.values()].filter(P => P.ok).length) + ')' : 'PLAY TOGETHER', () => { if (netGuest()) { closeUI(); quitToTitle(); } else { UI.open = 'coop'; COOP.err = ''; sfx('ui'); } });
   button(c, x + 8, y + h - 19, 118, 13, 'CONTROLS: ' + (SETTINGS.combat === 'simple' ? 'SIMPLE' : 'FULL'), () => { SETTINGS.combat = SETTINGS.combat === 'simple' ? 'full' : 'simple'; saveSettings(); sfx('ui'); });
   if (!A) button(c, x + 8, y + h - 36, 118, 13, 'CRAFTING: ' + (SETTINGS.craft === 'hands' ? 'HANDS-ON' : 'SIMPLE'), () => { SETTINGS.craft = SETTINGS.craft === 'hands' ? 'simple' : 'hands'; saveSettings(); UI.job = null; sfx('ui'); });
-  button(c, x + 130, y + h - 36, 118, 13, 'FPS MODE: ' + (SETTINGS.fpsMode ? 'ON' : 'OFF'), () => { SETTINGS.fpsMode = !SETTINGS.fpsMode; if (SETTINGS.fpsMode) G.parts.length = 0; saveSettings(); sfx('ui'); });
+  button(c, x + 130, y + h - 36, 118, 13, 'PERFORMANCE', () => { G.state = 'settings'; UI.open = null; sfx('ui'); });
   if (!A) button(c, x + 130, y + h - 19, 118, 13, 'DIFFICULTY: ' + DIFF().n, () => { SETTINGS.diff = SETTINGS.diff === 'easy' ? 'normal' : SETTINGS.diff === 'normal' ? 'hard' : 'easy'; saveSettings(); sfx('ui'); });
   const H = ['A / D  move        SPACE or W  jump        SHIFT  dodge', 'LMB  light attack (hold to keep going)   RMB or Q  heavy', ...(SETTINGS.combat === 'simple' ? ['Aim up to launch, aim down or hold S for low blows. Click', 'a creature to punch it, whatever you are holding.'] : ['Where you aim, which keys you hold, whether you are in', 'the air and how far the cursor is all change the attack.']), 'Dodge through a hit at the last moment, then strike: Riposte.', A ? '1-6 weapons    TAB scores    C forms    O sound' : '1-0 / wheel  hotbar     E  pack + crafting     C  forms', A ? 'R  throw sidearm    T  switch sidearm    Echoes leave when a Waker joins.' : 'J  journal + leads   F  talk / use   H  quick heal', A ? '' : 'R  throw sidearm   T  switch sidearm   S held: drop through bridges', A ? '' : 'Ore, keys and such leave your fists free.   K  knap   M  map', A ? '' : 'F beside a station uses it. Hold W/S on ladders. RMB opens doors.', A ? '' : 'V  weapon style (5 per weapon)   X  swap to off hand', A ? '' : 'Tools swing where you point, at rock or beast. Hold RMB: heavy.'];
   H.forEach((l, i) => drawText(c, l, x + 8, y + 42 + i * 12, i === 2 || i === 3 ? '#8ff5e6' : '#d8d4e6'));
@@ -9551,7 +9586,7 @@ function drawDialog(c) {
 }
 function drawUI(c) {
   HITS_NEXT = []; const uw = VS.uw, uh = VS.uh, st = G.state;
-  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'friends') drawFriends(c); else if (st === 'customize') drawCustomization(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
+  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'friends') drawFriends(c); else if (st === 'customize') drawCustomization(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'multiplayer') drawMultiplayer(c); else if (st === 'settings') drawSettings(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
   else if (st === 'loading') { c.fillStyle = 'rgba(18,13,31,.82)'; c.fillRect(0, 0, uw, uh); textC(c, G.loadMsg || 'Loading...', uw / 2, round(uh * .45), '#fff1a8', 1, textO); const n = (performance.now() / 300 | 0) % 4; textC(c, '.'.repeat(n), uw / 2, round(uh * .45) + 12, '#ffd35a', 1, textO); }
   else if (st === 'intro') {
     c.fillStyle = 'rgba(18,13,31,.84)'; c.fillRect(0, 0, uw, uh);
@@ -10391,7 +10426,7 @@ function enterArena(nick, skin, code) {
   accountSaveProfile();
   inv = new Array(INV_N).fill(null); RING_WEAPONS.forEach((id, i) => inv[i] = { id, n: 1 });
   G.p = newPlayer(); G.fighters = [G.p]; G.npcs = []; G.clock = .57; arenaRespawn(G.p); G.p.inv = 60;
-  snapCam(); G.state = 'play'; G.banner = { text: 'THE CINDER RING', sub: NET.room ? 'ring code: ' + (code || 'open') : 'practice with the echoes', t: 0 };
+  snapCam(); G.state = 'play'; G.banner = { text: 'DUEL MATCH', sub: NET.room ? 'queue: ' + (code || 'duel') : 'practice with the echoes', t: 0 };
   netJoin(code || 'open');
 }
 function arenaRespawn(f) {

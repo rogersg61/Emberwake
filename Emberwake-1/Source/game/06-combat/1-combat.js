@@ -8,7 +8,7 @@
 const ARM = 6.5;
 // player settings, kept between sessions on this computer
 const DIFFS = { easy: { n: 'EASY', taken: .7, regen: 2, hunger: .7 }, normal: { n: 'NORMAL', taken: 1, regen: 1, hunger: 1 }, hard: { n: 'HARD', taken: 1.25, regen: .6, hunger: 1.2 } };
-const SETTINGS = (() => { const d = { combat: 'simple', diff: 'easy', craft: 'simple', fpsMode: false }; try { return Object.assign(d, JSON.parse(localStorage.getItem('ew_settings') || '{}')); } catch (e) { return d; } })();
+const SETTINGS = (() => { const d = { combat: 'simple', diff: 'easy', craft: 'simple', fpsMode: false, fpsQuality: 65 }; try { const saved = JSON.parse(localStorage.getItem('ew_settings') || '{}'); const out = Object.assign(d, saved); if (typeof out.fpsQuality !== 'number') out.fpsQuality = out.fpsMode ? 25 : 65; return out; } catch (e) { return d; } })();
 const saveSettings = () => { try { localStorage.setItem('ew_settings', JSON.stringify(SETTINGS)); } catch (e) { } };
 const DIFF = () => DIFFS[SETTINGS.diff] || DIFFS.easy;
 const mv = (name, btn, hint, o) => Object.assign({ name, btn, hint, kind: 'swing', wind: 4, act: 5, rec: 10, dmg: 1, kb: [1.4, -.6], reach: 1, stop: 2, shake: 1, cost: 0, aimed: 18, center: 0, ctrl: .3 }, o);
