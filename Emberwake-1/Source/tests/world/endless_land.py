@@ -26,7 +26,7 @@ async def run():
     r = await h.ev("""(async()=>{
       const fx = SPAWN_X + 2500; streamTo(fx*T, true); const fy = heights[fx]; setTile(fx, fy, AIR); setTile(fx+1, fy-1, COBBLE); const nx = SPAWN_X + 20, ny = heights[nx]; setTile(nx, ny-1, PLANK);
       travelTo(SPAWN_X, VIL_Y); for (let i=0;i<5;i++) tick(); saveWorld(true);
-      const id=WORLD.id, meta=JSON.parse(localStorage.getItem('ew2.index')).find(m=>m.id===id);
+      const id=WORLD.id, meta=JSON.parse(localStorage.getItem(profileKey('index'))).find(m=>m.id===id);
       quitToTitle(); await new Promise(r=>setTimeout(r,200)); await openWorld(meta); await new Promise(r=>setTimeout(r,600)); if (G.state==='intro') beginPlay(false);
       const near = tileAt(nx, ny-1) === PLANK, farBefore = CST[floor(fx/CW)];
       streamTo(fx*T, true);

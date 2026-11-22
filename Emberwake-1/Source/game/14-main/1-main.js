@@ -510,14 +510,18 @@ addEventListener('keydown', e => {
     if (!e.metaKey && !e.ctrlKey) e.preventDefault();
     if (k === 'Backspace') { FORM[UI.focus] = FORM[UI.focus].slice(0, -1); e.preventDefault(); return; }
     if (k === 'Enter' || k === 'Tab' || k === 'Escape') { UI.focus = null; e.preventDefault(); return; }
-    if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey) { const lim = UI.focus === 'name' ? 24 : UI.focus === 'seed' ? 18 : UI.focus === 'gcode' ? 6 : 12; if (FORM[UI.focus].length < lim && /[A-Za-z0-9 _\-'.]/.test(e.key)) FORM[UI.focus] += UI.focus === 'nick' ? e.key.toUpperCase() : UI.focus === 'code' ? e.key.toLowerCase() : e.key; e.preventDefault(); }
+    if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+      const password = UI.focus === 'accountPassword' || UI.focus === 'accountConfirm', lim = password ? 64 : UI.focus === 'name' ? 24 : UI.focus === 'seed' ? 18 : UI.focus === 'gcode' ? 6 : 12;
+      if (FORM[UI.focus].length < lim && (password ? !/[\u0000-\u001f]/.test(e.key) : /[A-Za-z0-9 _\-'.]/.test(e.key))) FORM[UI.focus] += UI.focus === 'nick' ? e.key.toUpperCase() : UI.focus === 'code' ? e.key.toLowerCase() : e.key;
+      e.preventDefault();
+    }
     return;
   }
   if (!e.ctrlKey && !e.metaKey && (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape', 'ShiftLeft', 'ShiftRight', 'Backspace'].includes(k) || k.startsWith('Key') || k.startsWith('Digit'))) e.preventDefault();
   if (e.repeat) return; keys[k] = true; pressed[k] = true;
   if (G.state === 'intro') { if (k === 'Enter' || k === 'Space') { audioInit(); advance(); } return; }
   if (G.state === 'brlobby') { if (k === 'Escape') { brLeave(); sfx('ui'); } return; }
-  if (G.state !== 'play') { if (k === 'Escape') { G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'accounts') ACCOUNT.form = 'list'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
+  if (G.state !== 'play') { if (k === 'Escape') { if (G.state === 'accounts' && !ACCOUNT.active) return; G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'accounts') ACCOUNT.form = 'list'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
   if (G.dialog) { if (k === 'KeyF' || k === 'Space' || k === 'Enter' || k === 'KeyE') { dialogAdvance(); pressed[k] = false; } return; }
   if (k === 'Escape' || k === 'KeyP') { if (UI.open) { closeUI(); sfx('ui'); } else toggleUI('pause'); return; }
   if ((k === 'Enter' || k === 'NumpadEnter') && chatKey()) return;
@@ -547,7 +551,7 @@ addEventListener('mouseup', e => { if (e.button === 0) { mouse.l = false; mouse.
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   e.preventDefault(); const d = sign(e.deltaY);
-  if (G.state === 'worlds') { UI.scroll = max(0, UI.scroll + d); return; }
+  if (G.state === 'worlds' || G.state === 'accounts') { UI.scroll = max(0, UI.scroll + d); return; }
   if (G.state !== 'play') return;
   if (UI.open === 'map') mapZoom(d);
   else if (UI.open) UI.scroll = max(0, UI.scroll + d * (UI.open === 'inv' ? 1 : 2));
@@ -566,8 +570,8 @@ addEventListener('pagehide', e => {
 buildTiles(); buildTiles2(); buildSprites(); buildSprites2(); buildTiles3(); buildMobSprites(); buildDimArt(); buildPlaceArt(); buildBenchArt(); buildFurnArt(); buildDimMobs(); dimItemsPre(); buildItems(); brItems(); resize(); buildBayer();
 SIL = [genSil(31, 0), genSil(77, 1)]; for (let i = 0; i < 4; i++) VEILS.push(genVeil(i * 17));
 SHARDMOON = spr(['.....w.....', '....wWc....', '....WWc....', '...wWWcc...', '...WWWcc...', '..wWWWccc..', '..WWWWccd..', '.wWWWWcccd.', '..WWWccdd..', '..WWWcccd..', '...WWccd...', '...Wcccd...', '....ccd....', '....cd.....', '.....d.....'], { w: '#ffffff', W: '#dcf7f5', c: '#8fd0d8', d: '#62a9bc' });
-accountBoot(); saveBoot(); netBoot();
+accountBoot(); netBoot();
 Object.assign(WORLD, { id: '', name: 'Aldermere', seed: (Math.random() * 1e9) | 0, size: 0, shape: (Math.random() * 3) | 0, mode: 0, arena: false });
 SEED = WORLD.seed; genWorld(); freshSession(); G.p = newPlayer(); G.fighters = [G.p]; spawnNPCs(); G.clock = .3; updateSun();
-G.state = 'title'; G.cam.x = G.cam.px = camX((SPAWN_X - 70) * T); G.cam.y = G.cam.py = camY(heights[SPAWN_X - 40] * T - VS.vh * .62);
+G.state = 'accounts'; G.cam.x = G.cam.px = camX((SPAWN_X - 70) * T); G.cam.y = G.cam.py = camY(heights[SPAWN_X - 40] * T - VS.vh * .62);
 requestAnimationFrame(frame);

@@ -17,6 +17,8 @@ class H:
         self.pg.on('console', lambda m: self.errs.append(m.type+': '+m.text) if m.type in ('error','warning') else None)
         self.pg.on('pageerror', lambda e: self.errs.append('PAGEERROR: '+str(e)))
         await self.pg.goto(URL); await self.pg.wait_for_timeout(700)
+        if mode in ('world', 'arena'):
+            await self.ev("ACCOUNT.active = { id: 'test', name: 'TEST', skin: 0, hat: 0 }; SAVE.list = readLocalIndex();")
         if mode == 'world':
             await self.ev("Object.assign(WORLD,{id:'test',name:'Test',seed:%d,size:%d,shape:%d,mode:%d,arena:false}); G.skin=0; startWorld(null);"%(seed,size,shape,gmode))
             for i in range(100):

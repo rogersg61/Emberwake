@@ -5,7 +5,7 @@
 //  (so worlds follow you between devices). Nobody else can read it.
 // ============================================================
 const SAVE = { db: null, uid: null, list: [], busy: false, pending: null, status: 'local', note: '' };
-const ACCOUNT = { profiles: [], active: null, form: 'list', note: '' };
+const ACCOUNT = { profiles: [], active: null, form: 'list', note: '', loginId: null, busy: false };
 const LS = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
@@ -13,39 +13,109 @@ const LS = {
 };
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
 const accountId = () => ACCOUNT.active ? ACCOUNT.active.id : 'none';
-const dpath = k => 'data/users/' + SAVE.uid + '/accounts/' + accountId() + '/' + k;
+const dpath = (k, owner = accountId()) => 'data/users/' + SAVE.uid + '/accounts/' + owner + '/' + k;
 const profileKey = k => 'ew2.p.' + accountId() + '.' + k;
+const profilePath = (id, k) => 'ew2.p.' + id + '.' + k;
 function readAccountProfiles() { try { const a = JSON.parse(LS.get('ew2.accounts') || '[]'); return Array.isArray(a) ? a.filter(p => p && typeof p.id === 'string' && typeof p.name === 'string') : []; } catch (e) { return []; } }
-function writeAccountProfiles() { LS.set('ew2.accounts', JSON.stringify(ACCOUNT.profiles)); }
+function writeAccountProfiles() { return LS.set('ew2.accounts', JSON.stringify(ACCOUNT.profiles)); }
 function accountBoot() {
   ACCOUNT.profiles = readAccountProfiles();
-  if (!ACCOUNT.profiles.length) {
-    const guest = { id: 'guest', name: 'Guest', skin: 0, hat: 0, pin: '' };
-    ACCOUNT.profiles = [guest]; writeAccountProfiles();
-  }
-  let active = LS.get('ew2.active');
-  ACCOUNT.active = ACCOUNT.profiles.find(p => p.id === active) || ACCOUNT.profiles[0];
-  G.nick = ACCOUNT.active.name; G.skin = clamp(ACCOUNT.active.skin | 0, 0, 5); G.hat = clamp(ACCOUNT.active.hat | 0, 0, 3);
-  LS.set('ew2.active', ACCOUNT.active.id);
-  SAVE.list = readLocalIndex(); sortWorlds();
+  ACCOUNT.active = null; ACCOUNT.loginId = null; ACCOUNT.form = 'list'; ACCOUNT.note = ''; ACCOUNT.busy = false;
+  LS.del('ew2.active');
+  G.nick = 'WAKER'; G.skin = 0; G.hat = 0; SAVE.list = [];
 }
 function cleanAccountName(s) { s = String(s || '').trim().replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 18); return s; }
-function accountCreate(name, pin, skin, hat) {
-  name = cleanAccountName(name) || 'WAKER';
-  pin = String(pin || '').replace(/[^0-9]/g, '').slice(0, 8);
-  const p = { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name, skin: clamp(skin | 0, 0, 5), hat: clamp(hat | 0, 0, 3), pin };
-  ACCOUNT.profiles.push(p); writeAccountProfiles(); accountSwitch(p.id); ACCOUNT.note = 'Account created.';
+function accountSalt() {
+  if (!crypto || !crypto.getRandomValues) throw new Error('Secure password storage is unavailable in this browser.');
+  return [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function accountPasswordHash(password, saltHex) {
+  if (!crypto || !crypto.subtle || !window.TextEncoder) throw new Error('Secure password storage is unavailable in this browser.');
+  const salt = Uint8Array.from(saltHex.match(/../g), b => parseInt(b, 16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, key, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function accountPasswordValid(password, confirm) {
+  if (String(password || '').length < 8) { ACCOUNT.note = 'Use a password with at least 8 characters.'; return false; }
+  if (password !== confirm) { ACCOUNT.note = 'Those passwords do not match.'; return false; }
+  return true;
+}
+function migrateGuestWorlds() {
+  const oldIndex = LS.get(profilePath('guest', 'index')) || LS.get('ew2.index');
+  if (!oldIndex || LS.get(profilePath(accountId(), 'index')) !== null) return;
+  let worlds;
+  try { worlds = JSON.parse(oldIndex); } catch (e) { return; }
+  if (!Array.isArray(worlds)) return;
+  SAVE.list = worlds.filter(m => m && typeof m.id === 'string');
+  for (const m of SAVE.list) {
+    const raw = LS.get(profilePath('guest', 'w.' + m.id)) || LS.get('ew2.w.' + m.id);
+    if (raw !== null && LS.get(profilePath(accountId(), 'w.' + m.id)) === null) LS.set(profilePath(accountId(), 'w.' + m.id), raw);
+  }
+  writeLocalIndex(); sortWorlds();
+}
+async function accountCreate(name, password, confirm, skin, hat) {
+  name = cleanAccountName(name);
+  if (!name) { ACCOUNT.note = 'Enter an account name.'; return false; }
+  if (ACCOUNT.profiles.some(p => p.name.toLowerCase() === name.toLowerCase())) { ACCOUNT.note = 'That account name is already in use.'; return false; }
+  if (!accountPasswordValid(password, confirm)) return false;
+  if (ACCOUNT.busy) return false;
+  ACCOUNT.busy = true; ACCOUNT.note = '';
+  try {
+    const salt = accountSalt(), hash = await accountPasswordHash(password, salt);
+    const firstAccount = !ACCOUNT.profiles.some(p => p.id !== 'guest');
+    const p = { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name, skin: clamp(skin | 0, 0, 5), hat: clamp(hat | 0, 0, 3), salt, hash };
+    ACCOUNT.profiles.push(p);
+    if (!writeAccountProfiles()) { ACCOUNT.profiles.pop(); ACCOUNT.note = 'Could not save this account in this browser.'; return false; }
+    accountSwitch(p.id);
+    if (firstAccount) migrateGuestWorlds();
+    ACCOUNT.note = 'Account created. Saves stay in this browser unless cloud saving is available.';
+    G.state = 'title'; ACCOUNT.form = 'list'; ACCOUNT.loginId = null;
+    return true;
+  } catch (e) {
+    ACCOUNT.note = e && e.message ? e.message : 'Could not create the account.';
+    return false;
+  } finally { ACCOUNT.busy = false; }
 }
 function accountSwitch(id) {
   const p = ACCOUNT.profiles.find(v => v.id === id); if (!p) return false;
-  ACCOUNT.active = p; LS.set('ew2.active', p.id); G.nick = p.name; G.skin = clamp(p.skin | 0, 0, 5); G.hat = clamp(p.hat | 0, 0, 3);
+  ACCOUNT.active = p; LS.del('ew2.active'); G.nick = p.name; G.skin = clamp(p.skin | 0, 0, 5); G.hat = clamp(p.hat | 0, 0, 3);
   if (FORM) { FORM.nick = p.name; FORM.skin = G.skin; FORM.hat = G.hat; }
   SAVE.list = readLocalIndex(); sortWorlds(); ACCOUNT.note = 'Logged in as ' + p.name + '.';
+  saveBoot();
   return true;
 }
-function accountLogin(p, pin) {
-  if (p.pin && String(pin || '') !== p.pin) { ACCOUNT.note = 'Wrong PIN.'; return false; }
-  accountSwitch(p.id); G.state = 'title'; return true;
+async function accountSetPassword(p, password, confirm) {
+  if (!p || !accountPasswordValid(password, confirm) || ACCOUNT.busy) return false;
+  ACCOUNT.busy = true; ACCOUNT.note = '';
+  try {
+    p.salt = accountSalt(); p.hash = await accountPasswordHash(password, p.salt); delete p.pin;
+    if (!writeAccountProfiles()) { delete p.salt; delete p.hash; ACCOUNT.note = 'Could not save this account in this browser.'; return false; }
+    accountSwitch(p.id); G.state = 'title'; ACCOUNT.form = 'list'; return true;
+  } catch (e) {
+    ACCOUNT.note = e && e.message ? e.message : 'Could not set the account password.';
+    return false;
+  } finally { ACCOUNT.busy = false; }
+}
+async function accountLogin(p, password) {
+  if (!p || ACCOUNT.busy) return false;
+  if (!p.salt || !p.hash) { ACCOUNT.note = 'Set a password for this older account to continue.'; return false; }
+  ACCOUNT.busy = true; ACCOUNT.note = '';
+  try {
+    const hash = await accountPasswordHash(String(password || ''), p.salt);
+    if (hash !== p.hash) { ACCOUNT.note = 'Wrong password.'; return false; }
+    accountSwitch(p.id); G.state = 'title'; ACCOUNT.form = 'list'; return true;
+  } catch (e) {
+    ACCOUNT.note = e && e.message ? e.message : 'Could not log in.';
+    return false;
+  } finally { ACCOUNT.busy = false; }
+}
+function accountLogout() {
+  if (G.state === 'play' && WORLD.id && !WORLD.arena) saveWorld(true);
+  if (COOP.role) coopLeave();
+  ACCOUNT.active = null; ACCOUNT.loginId = null; ACCOUNT.form = 'list'; ACCOUNT.note = 'Signed out.';
+  SAVE.list = []; LS.del('ew2.active');
+  G.state = 'accounts'; UI.open = null; UI.focus = null; UI.held = null;
 }
 function accountSaveProfile() {
   if (!ACCOUNT.active) return;
@@ -61,6 +131,8 @@ function readLocalIndex() {
 }
 function writeLocalIndex() { LS.set(profileKey('index'), JSON.stringify(SAVE.list)); }
 function saveBoot() {
+  if (!ACCOUNT.active) return;
+  const owner = accountId();
   SAVE.list = readLocalIndex(); sortWorlds();
   try {
     if (!(window.claude && window.claude.use)) return;
@@ -68,11 +140,12 @@ function saveBoot() {
       if (!user || !db) return; const uid = await user.id(); if (!uid) return;
       SAVE.db = db; SAVE.uid = uid; SAVE.status = 'syncing';
       try {
-        const snap = await withTimeout(db.doc(dpath('index')).get(), 9000);
+        const snap = await withTimeout(db.doc(dpath('index', owner)).get(), 9000);
+        if (accountId() !== owner) return;
         const remote = snap && snap.exists && Array.isArray((snap.data() || {}).worlds) ? snap.data().worlds : [];
         for (const m of remote) { if (!m || typeof m.id !== 'string') continue; const i = SAVE.list.findIndex(l => l.id === m.id); if (i < 0) SAVE.list.push(Object.assign({}, m, { cloud: true })); else if ((m.savedAt || 0) > (SAVE.list[i].savedAt || 0)) SAVE.list[i] = Object.assign({}, m, { cloud: true }); else SAVE.list[i].cloud = true; }
         sortWorlds(); writeLocalIndex(); SAVE.status = 'cloud';
-      } catch (e) { SAVE.status = 'cloud'; }
+      } catch (e) { if (accountId() === owner) SAVE.status = 'cloud'; }
     }, () => { });
   } catch (e) { }
 }
@@ -93,28 +166,29 @@ function saveWorld(quiet) {
   const okLocal = LS.set(profileKey('w.' + WORLD.id), JSON.stringify(data));
   const i = SAVE.list.findIndex(m => m.id === WORLD.id); if (i < 0) SAVE.list.unshift(meta); else SAVE.list[i] = Object.assign(SAVE.list[i], meta);
   sortWorlds(); writeLocalIndex(); G.dirty = false; G.saveT = 0;
-  if (SAVE.db) { SAVE.pending = data; if (!SAVE.busy) pumpSaves(); }
+  if (SAVE.db) { SAVE.pending = { data, owner: accountId(), worlds: SAVE.list.map(m => Object.assign({}, m)) }; if (!SAVE.busy) pumpSaves(); }
   if (!quiet) G.savedNote = { t: 0, ok: okLocal || !!SAVE.db };
 }
 async function pumpSaves() {
   SAVE.busy = true;
   while (SAVE.pending && SAVE.db) {
-    const data = SAVE.pending; SAVE.pending = null;
+    const pending = SAVE.pending, data = pending.data, owner = pending.owner; SAVE.pending = null;
     try {
       const mods = data.mods || '', parts = []; for (let i = 0; i < mods.length; i += 180000) parts.push(mods.slice(i, i + 180000));
-      for (let k = 0; parts.length > 1 && k < parts.length; k++) await withTimeout(SAVE.db.doc(dpath('w-' + data.id + '-m' + k)).set({ s: parts[k] }), 15000);
-      await withTimeout(SAVE.db.doc(dpath('w-' + data.id)).set(Object.assign({}, data, { mods: parts.length > 1 ? '' : mods, mparts: parts.length > 1 ? parts.length : 0 })), 15000);
-      const m = SAVE.list.find(l => l.id === data.id); if (m) m.cloud = true;
-      await withTimeout(SAVE.db.doc(dpath('index')).set({ worlds: SAVE.list.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) }), 15000);
-      SAVE.status = 'cloud';
+      for (let k = 0; parts.length > 1 && k < parts.length; k++) await withTimeout(SAVE.db.doc(dpath('w-' + data.id + '-m' + k, owner)).set({ s: parts[k] }), 15000);
+      await withTimeout(SAVE.db.doc(dpath('w-' + data.id, owner)).set(Object.assign({}, data, { mods: parts.length > 1 ? '' : mods, mparts: parts.length > 1 ? parts.length : 0 })), 15000);
+      const m = pending.worlds.find(l => l.id === data.id); if (m) m.cloud = true;
+      await withTimeout(SAVE.db.doc(dpath('index', owner)).set({ worlds: pending.worlds.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) }), 15000);
+      if (accountId() === owner) SAVE.status = 'cloud';
     } catch (e) {
-      const c = e && e.code; SAVE.status = c === 'quota_exceeded' ? 'cloud full' : 'local';
+      const c = e && e.code; if (accountId() === owner) SAVE.status = c === 'quota_exceeded' ? 'cloud full' : 'local';
       if (c === 'invalid_argument' || c === 'revoked' || c === 'not_granted' || c === 'quota_exceeded') SAVE.db = null;
     }
   }
   SAVE.busy = false;
 }
 async function loadWorldData(id) {
+  const owner = accountId();
   let local = null;
   try {
     const own = LS.get(profileKey('w.' + id));
@@ -124,23 +198,25 @@ async function loadWorldData(id) {
   let remote = null;
   if (SAVE.db) {
     try {
-      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000);
+      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id, owner)).get(), 9000);
       if (s && s.exists) {
         remote = Object.assign({}, s.data());
-        if (remote.mparts > 0) { let m = ''; for (let k = 0; k < remote.mparts; k++) { const ps = await withTimeout(SAVE.db.doc(dpath('w-' + id + '-m' + k)).get(), 9000); m += ps && ps.exists ? (ps.data().s || '') : ''; } remote.mods = m; }
+        if (remote.mparts > 0) { let m = ''; for (let k = 0; k < remote.mparts; k++) { const ps = await withTimeout(SAVE.db.doc(dpath('w-' + id + '-m' + k, owner)).get(), 9000); m += ps && ps.exists ? (ps.data().s || '') : ''; } remote.mods = m; }
       }
     } catch (e) { }
   }
   return remote && (!local || (remote.savedAt || 0) > (local.savedAt || 0)) ? remote : local;
 }
 function deleteWorld(id) {
+  const owner = accountId();
   const m = SAVE.list.find(l => l.id === id); SAVE.list = SAVE.list.filter(l => l.id !== id); writeLocalIndex(); LS.del(profileKey('w.' + id)); if (accountId() === 'guest') LS.del('ew2.w.' + id);
+  const worlds = SAVE.list.map(l => Object.assign({}, l));
   if (SAVE.db && m) (async () => {
     try {
-      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000); const n = s && s.exists ? (s.data().mparts || 0) : 0;
-      for (let k = 0; k < n; k++) await SAVE.db.doc(dpath('w-' + id + '-m' + k)).delete();
-      await SAVE.db.doc(dpath('w-' + id)).delete();
-      await SAVE.db.doc(dpath('index')).set({ worlds: SAVE.list.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) });
+      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id, owner)).get(), 9000); const n = s && s.exists ? (s.data().mparts || 0) : 0;
+      for (let k = 0; k < n; k++) await SAVE.db.doc(dpath('w-' + id + '-m' + k, owner)).delete();
+      await SAVE.db.doc(dpath('w-' + id, owner)).delete();
+      await SAVE.db.doc(dpath('index', owner)).set({ worlds: worlds.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) });
     } catch (e) { }
   })();
 }

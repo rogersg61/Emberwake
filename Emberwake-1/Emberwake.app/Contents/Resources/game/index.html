@@ -4133,7 +4133,7 @@ function trinkLoad(o) {
 const G = {
   state: 'title', time: 0, clock: .1, fires: [], smokes: [], stuck: [], linksKnown: new Set(), link: null, zoom: 1, zoomT: 1, armT: 0, linkBanner: null, hitstop: 0, shake: 0, tscale: 1, slowT: 0, p: null, enemies: [], fighters: [], npcs: [], drops: [], projs: [], nums: [], parts: [], trails: [], ghosts: [],
   flags: {}, combo: { n: 0, t: 0, pts: 0 }, feed: [], picks: [], cam: { x: 0, y: 0, px: 0, py: 0 }, boss: null, duel: null, flash: 0, flashCol: '255,255,255', sun: [1, 1, 1], dn: 1, spawnT: 0, biome: '', biomeT: 0,
-  sel: 0, selT: 0, known: new Set(), movesUsed: new Set(), journal: [], jNew: false, q: 0, qFlash: 0, says: [], sayCur: null, note: null, banner: null, dialog: null, kfeed: [], skin: 0, nick: '', dirty: false, played: 0, introI: 0, introT: 0
+  sel: 0, selT: 0, known: new Set(), movesUsed: new Set(), journal: [], jNew: false, q: 0, qFlash: 0, says: [], sayCur: null, note: null, banner: null, dialog: null, kfeed: [], skin: 0, hat: 0, nick: '', dirty: false, played: 0, introI: 0, introT: 0
 };
 const addShake = v => { G.shake = max(G.shake, v * .6); };
 {
@@ -4185,7 +4185,7 @@ function moveBody(e) {
 }
 
 // ---------------- particles ----------------
-function P(x, y, vx, vy, life, col, o) { if (G.parts.length > 1400) return; const p = { x, y, vx, vy, life, max: life, col, sz: 1, g: .12, fr: .985, glow: 0, hit: 0 }; if (o) Object.assign(p, o); G.parts.push(p); }
+function P(x, y, vx, vy, life, col, o) { if (SETTINGS.fpsMode || G.parts.length > 1400) return; const p = { x, y, vx, vy, life, max: life, col, sz: 1, g: .12, fr: .985, glow: 0, hit: 0 }; if (o) Object.assign(p, o); G.parts.push(p); }
 function burst(x, y, n, cols, sp, life, o) { for (let i = 0; i < n; i++) { const a = frand(TAU), v = frand(.2, 1) * sp; P(x, y, cos(a) * v, sin(a) * v, max(4, life * frand(.5, 1) | 0), fpick(cols), o); } }
 function tickParts() {
   const a = G.parts;
@@ -5452,7 +5452,7 @@ function oreSeekerFx() {
 const ARM = 6.5;
 // player settings, kept between sessions on this computer
 const DIFFS = { easy: { n: 'EASY', taken: .7, regen: 2, hunger: .7 }, normal: { n: 'NORMAL', taken: 1, regen: 1, hunger: 1 }, hard: { n: 'HARD', taken: 1.25, regen: .6, hunger: 1.2 } };
-const SETTINGS = (() => { const d = { combat: 'simple', diff: 'easy', craft: 'simple' }; try { return Object.assign(d, JSON.parse(localStorage.getItem('ew_settings') || '{}')); } catch (e) { return d; } })();
+const SETTINGS = (() => { const d = { combat: 'simple', diff: 'easy', craft: 'simple', fpsMode: false }; try { return Object.assign(d, JSON.parse(localStorage.getItem('ew_settings') || '{}')); } catch (e) { return d; } })();
 const saveSettings = () => { try { localStorage.setItem('ew_settings', JSON.stringify(SETTINGS)); } catch (e) { } };
 const DIFF = () => DIFFS[SETTINGS.diff] || DIFFS.easy;
 const mv = (name, btn, hint, o) => Object.assign({ name, btn, hint, kind: 'swing', wind: 4, act: 5, rec: 10, dmg: 1, kb: [1.4, -.6], reach: 1, stop: 2, shake: 1, cost: 0, aimed: 18, center: 0, ctrl: .3 }, o);
@@ -6820,7 +6820,7 @@ function newFighter(x, y, o) {
     fighter: true, x, y, px: x, py: y, w: 6, h: 20, vx: 0, vy: 0, face: 1, onGround: false, canStep: true, stepVis: 0, hp: 100, maxhp: 100, stam: 100, maxstam: 100, stamDelay: 0,
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
-    placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
+    placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
     kills: 0, deaths: 0, foes: [], atkN: 0
   };
   Object.assign(f, o);
@@ -6828,7 +6828,7 @@ function newFighter(x, y, o) {
   return f;
 }
 function newPlayer() {
-  const sx = SPOTS.camp ? SPOTS.camp.x - 6 : SPAWN_X, sy = SPOTS.camp ? SPOTS.camp.y : heights[SPAWN_X]; const p = newFighter(sx * T + 1, (sy - 3) * T, { isPlayer: true, skin: G.skin || 0, name: G.nick || 'You' });
+  const sx = SPOTS.camp ? SPOTS.camp.x - 6 : SPAWN_X, sy = SPOTS.camp ? SPOTS.camp.y : heights[SPAWN_X]; const p = newFighter(sx * T + 1, (sy - 3) * T, { isPlayer: true, skin: G.skin || 0, hat: G.hat || 0, name: G.nick || 'You' });
   while (boxHits(p.x, p.y, p.w, p.h)) p.y -= T; p.py = p.y; return p;
 }
 function reviveFighter(f, x, y) {
@@ -7086,6 +7086,11 @@ function armDraw(x, sx, sy, ang, ext, col, hand) {
   seg(x, sx, sy, ex, ey, 2, col); seg(x, ex, ey, hx, hy, 2, col); x.fillStyle = hand; x.fillRect(round(hx - 1), round(hy - 1), 2, 2);
 }
 function basePose() { return { l1a: .08, l1b: .08, l2a: -.08, l2b: -.08, lean: 0, bob: 0, armA: 1.15, armExt: .8, armB: 1.75, armBext: .85, wAng: -.6, wOff: 0, rot: 0, head: 0, crouch: 0, tuck: 0, kick: 0, stance: 0 }; }
+function drawHat(x, hat) {
+  if (hat === 1) { x.fillStyle = '#7a3222'; x.fillRect(-4, -11, 8, 2); x.fillStyle = '#ff8a3d'; x.fillRect(-3, -14, 6, 3); x.fillStyle = '#ffd35a'; x.fillRect(-1, -16, 2, 2); }
+  else if (hat === 2) { x.fillStyle = '#ffd35a'; x.fillRect(-4, -12, 8, 3); x.fillStyle = '#fff1a8'; x.fillRect(-3, -15, 2, 3); x.fillRect(1, -15, 2, 3); x.fillRect(-1, -14, 2, 2); }
+  else if (hat === 3) { x.fillStyle = '#4fd8c8'; x.fillRect(-4, -12, 8, 2); x.fillStyle = '#c9fff6'; x.fillRect(-2, -15, 4, 3); x.fillStyle = '#8ff5e6'; x.fillRect(-1, -17, 2, 2); }
+}
 function drawRig(x, P, S, wp, wp2) {
   x.save();
   if (P.spin !== undefined) { const s = P.spin; x.scale(abs(s) < .3 ? (s < 0 ? -.3 : .3) : s, 1); }
@@ -7099,7 +7104,7 @@ function drawRig(x, P, S, wp, wp2) {
   if (wp2) { const L2 = ARM * clamp(P.armBext, .3, 1), hx2 = shx - 1.5 + cos(P.armB) * L2, hy2 = shy + sin(P.armB) * L2; x.save(); x.translate(hx2, hy2); x.rotate(P.w2Ang !== undefined ? P.w2Ang : P.armB - 1.05); x.drawImage(wp2.held, -wp2.grip[0], -wp2.grip[1]); x.restore(); }
   armDraw(x, shx - 1.5, shy, P.armB, P.armBext, S.armB, S.handB);
   legDraw(x, -.9, hipY, l2a, l2b, S.legB, S.boot); legDraw(x, .9, hipY, l1a, l1b, S.leg, S.boot);
-  x.save(); x.translate(0, hipY); x.rotate(lean); x.drawImage(S.torso, -3, -8 + P.bob); x.translate(0, -7 + P.bob); x.rotate(P.head); x.drawImage(S.head, S.hx, S.hy); x.restore();
+  x.save(); x.translate(0, hipY); x.rotate(lean); x.drawImage(S.torso, -3, -8 + P.bob); x.translate(0, -7 + P.bob); x.rotate(P.head); x.drawImage(S.head, S.hx, S.hy); drawHat(x, S.hat || 0); x.restore();
   const L = ARM * clamp(P.armExt, .3, 1), hx = shx + cos(P.armA) * L, hy = shy + sin(P.armA) * L;
   if (wp) {
     x.save(); x.translate(hx, hy); x.rotate(P.wAng); if (P.wFlip !== undefined) x.scale(abs(P.wFlip) < .18 ? (P.wFlip < 0 ? -.18 : .18) : P.wFlip, 1);
@@ -7157,6 +7162,7 @@ const TORCH_HELD = { held: null, grip: [2, 5] };
 function visHeld(f) { if (f.isPlayer && (f.toolT > 0 || f.toolCharge > 0) && f.swingTool && f.swingTool.held && !f.atk) return f.swingTool; if (f.isPlayer && (f.toolT > 0 || f.toolCharge > 0) && !f.atk && f.swingTool === HAND) return null; if (f === G.p) return f.atk && f.atk.W ? f.atk.W : heldItem() || heldOf(f); return heldOf(f); }
 function drawFighterRig(x, f, al, rx, ry) {
   const P = fighterPose(f, al), it = visHeld(f), S = f === G.p ? gearSkin(SK[f.skin] || SK[0], f.skin) : f.coop && f.gearObj ? gearSkinOf(f) : SK[f.skin] || SK[0];
+  S.hat = f.hat || 0;
   if (S.scarf) { const sc = f.scarf; for (let i = 1; i < sc.length; i++) seg(x, sc[i - 1].x - rx, sc[i - 1].y - ry, sc[i].x - rx, sc[i].y - ry, i < 3 ? 2.4 : 2, S.scarf[i % 2]); }
   let wp = null, wp2 = null; if (it) { if (it.held || it.chuks) { wp = it; if (it.dual) wp2 = it; } else if (it.id === 'torch') { TORCH_HELD.held = SPR.i_torch; wp = TORCH_HELD; } }
   x.save(); x.scale(f.face, 1); drawRig(x, P, S, wp, wp2); x.restore();
@@ -8926,7 +8932,7 @@ function eventSun() {
 //  a hit box while it draws; clicks test last frame's boxes.
 // ============================================================
 const inR = (x, y, w, h) => mouse.ux >= x && mouse.ux < x + w && mouse.uy >= y && mouse.uy < y + h;
-const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, nick: '', code: '' };
+const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', accountName: '', accountPassword: '', accountConfirm: '' };
 const SIZE_D = ['600 x 260 tiles', '900 x 320 tiles', '1400 x 380 tiles', '2200 x 440 tiles: days to cross'], SHAPE_D = ['every seed deals its lands in a new order', 'the Drift is crowded with islands', 'few islands, the Underdark yawns wider'], MODE_D = ['three embers, any order, nothing forced', 'every item, no monsters, build freely'];
 let HITS = [], HITS_NEXT = [];
 const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!slot });
@@ -8943,7 +8949,7 @@ function button(c, x, y, w, h, label, fn, o = {}) {
   if (!o.off) hit(x, y, w, h, fn);
 }
 function field(c, x, y, w, key, ph) {
-  const f = UI.focus === key, v = FORM[key];
+  const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
   if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
   if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
@@ -8958,10 +8964,18 @@ function chooser(c, x, y, w, label, names, key, descs) {
 }
 function skinPicker(c, x, y) {
   drawText(c, 'LOOK', x, y + 8, '#b9bdd0');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < SKINS.length; i++) {
     const bx = x + 46 + i * 24, on = FORM.skin === i; c.fillStyle = on ? '#ffd35a' : inR(bx, y, 20, 22) ? '#8c86a8' : '#4a4460'; c.fillRect(bx, y, 20, 22); c.fillStyle = '#262234'; c.fillRect(bx + 1, y + 1, 18, 20);
     c.drawImage(SK[i].head, bx + 3, y + 2, 14, 14); c.fillStyle = SKINS[i][4]; c.fillRect(bx + 3, y + 17, 7, 2); c.fillStyle = SKINS[i][0]; c.fillRect(bx + 10, y + 17, 7, 2);
     hit(bx, y, 20, 22, () => { FORM.skin = i; sfx('ui'); });
+  }
+}
+function hatPicker(c, x, y) {
+  const names = ['NO HAT', 'EMBER', 'CROWN', 'FROST'];
+  drawText(c, 'HAT', x, y + 8, '#b9bdd0');
+  for (let i = 0; i < names.length; i++) {
+    const bx = x + 46 + i * 48, on = FORM.hat === i;
+    button(c, bx, y, 44, 16, names[i], () => { FORM.hat = i; sfx('ui'); }, { on });
   }
 }
 function slotBox(c, x, y, sel, hov) { c.fillStyle = sel ? '#ffd35a' : hov ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, 18, 18); c.fillStyle = sel ? '#3a3350' : '#262234'; c.fillRect(x + 1, y + 1, 16, 16); }
@@ -9048,7 +9062,8 @@ function drawTitle(c) {
   button(c, bx, by + 23, bw, 18, 'JOIN A FRIEND', () => { G.state = 'join'; UI.focus = null; COOP.err = ''; COOP.note = ''; COOP.long = false; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
   button(c, bx, by + 46, bw, 18, 'THE CINDER RING : ONLINE PVP', () => { G.state = 'ring'; UI.focus = null; if (!FORM.nick) FORM.nick = 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
   button(c, bx, by + 69, bw, 18, 'THE ASHFALL : BATTLE ROYALE', () => { G.state = 'brform'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); if (FORM.brcode === undefined) FORM.brcode = ''; sfx('ui'); });
-  button(c, bx, by + 92, bw, 18, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
+  button(c, bx, by + 92, bw, 18, 'ACCOUNT: ' + (ACCOUNT.active ? ACCOUNT.active.name.toUpperCase().slice(0, 16) : 'GUEST'), () => { G.state = 'accounts'; ACCOUNT.note = ''; UI.focus = null; sfx('ui'); });
+  button(c, bx, by + 115, bw, 18, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
   textC(c, 'build, explore, and fight with every form', uw / 2, uh - 26, '#d8d4e6', 1, textO);
   textC(c, 'mouse + keyboard', uw / 2, uh - 15, '#8b8fa3', 1, textO);
   const vs = 'version ' + GAME_VERSION; textS(c, vs, uw - textW(vs) - 4, uh - 10, '#6a6485');
@@ -9062,7 +9077,7 @@ function drawWorlds(c) {
   for (let i = 0; i < vis; i++) {
     const m = SAVE.list[i + UI.scroll]; if (!m) break; const ry = y + 16 + i * rowH, hv = inR(x + 4, ry, w - 8, rowH - 3);
     c.fillStyle = hv ? '#2b2740' : '#221e30'; c.fillRect(x + 4, ry, w - 8, rowH - 3);
-    c.drawImage(SK[clamp(m.skin | 0, 0, 3)].head, x + 8, ry + 4, 14, 14); if (!m.mode) for (let k = 0; k < 3; k++) { c.fillStyle = k < (m.e | 0) ? ['#ffd35a', '#8ff5e6', '#ff9a3d'][k] : '#3a3450'; c.fillRect(x + 9 + k * 4, ry + 19, 3, 2); }
+    c.drawImage(SK[clamp(m.skin | 0, 0, 5)].head, x + 8, ry + 4, 14, 14); if (!m.mode) for (let k = 0; k < 3; k++) { c.fillStyle = k < (m.e | 0) ? ['#ffd35a', '#8ff5e6', '#ff9a3d'][k] : '#3a3450'; c.fillRect(x + 9 + k * 4, ry + 19, 3, 2); }
     drawText(c, String(m.name || 'World').slice(0, 24), x + 28, ry + 3, '#fff');
     const prog = m.mode ? 'free forge' : m.v < 3 ? 'old world (will regrow)' : (m.e | 0) + ' of 3 embers';
     { let info = `${MODE_N[m.mode ? 1 : 0]} - ${m.endless ? (GEN_RANGE_N[m.size | 0] || 'Normal') + ' range' : SIZE_N[m.size | 0] || ''} - ${SHAPE_N[m.shape | 0] || ''} - ${prog} - ${fmtTime(m.played || 0)}`; const room = w - 160; if (textW(info) > room) info = `${prog} - ${fmtTime(m.played || 0)}`; while (info.length > 4 && textW(info) > room) info = info.slice(0, -1); drawText(c, info, x + 28, ry + 13, '#8b8fa3'); }
@@ -9083,7 +9098,7 @@ function drawWorlds(c) {
   button(c, x + w - 66, y + h - 20, 60, 15, 'BACK', () => { G.state = 'title'; G.worldNote = ''; sfx('ui'); });
 }
 function drawCreate(c) {
-  const uw = VS.uw, uh = VS.uh, w = min(300, uw - 16), h = 236, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  const uw = VS.uw, uh = VS.uh, w = min(300, uw - 16), h = 258, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FORGE A NEW WORLD');
   const fx = x + 10, fw = w - 20;
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'name', 'my world');
@@ -9092,8 +9107,71 @@ function drawCreate(c) {
   chooser(c, fx, y + 92, fw, 'SHAPE', SHAPE_N, 'shape', SHAPE_D);
   chooser(c, fx, y + 124, fw, 'MODE', MODE_N, 'mode', MODE_D);
   skinPicker(c, fx, y + 158);
-  button(c, x + 10, y + h - 26, 140, 18, 'FORGE WORLD', () => { UI.focus = null; createWorld({ name: FORM.name.trim() || 'World', seed: FORM.seed, size: FORM.size, shape: FORM.shape, mode: FORM.mode, skin: FORM.skin }); sfx('quest', 0); });
+  hatPicker(c, fx, y + 188);
+  button(c, x + 10, y + h - 26, 140, 18, 'FORGE WORLD', () => { UI.focus = null; createWorld({ name: FORM.name.trim() || 'World', seed: FORM.seed, size: FORM.size, shape: FORM.shape, mode: FORM.mode, skin: FORM.skin, hat: FORM.hat }); sfx('quest', 0); });
   button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { G.state = 'worlds'; UI.focus = null; sfx('ui'); });
+}
+function drawAccounts(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(340, uw - 16), h = min(260, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'ACCOUNTS');
+  const fx = x + 10, fw = w - 20;
+  if (ACCOUNT.form === 'create') {
+    drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'accountName', 'account name');
+    drawText(c, 'PASS', fx, y + 42, '#b9bdd0'); field(c, fx + 46, y + 38, fw - 46, 'accountPassword', '8 characters minimum');
+    drawText(c, 'AGAIN', fx, y + 62, '#b9bdd0'); field(c, fx + 46, y + 58, fw - 46, 'accountConfirm', 'confirm password');
+    skinPicker(c, fx, y + 78);
+    hatPicker(c, fx, y + 108);
+    button(c, x + 10, y + h - 26, 150, 18, ACCOUNT.busy ? 'CREATING...' : 'CREATE ACCOUNT', () => {
+      UI.focus = null;
+      accountCreate(FORM.accountName, FORM.accountPassword, FORM.accountConfirm, FORM.skin, FORM.hat).then(ok => {
+        if (ok) { G.skin = FORM.skin; G.hat = FORM.hat; G.nick = ACCOUNT.active.name; FORM.accountPassword = FORM.accountConfirm = ''; }
+      });
+      sfx('quest', 0);
+    }, { off: ACCOUNT.busy });
+    button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
+  } else {
+    textC(c, 'SIGN IN TO CONTINUE', uw / 2, y + 17, '#b9bdd0', 1, drawText);
+    textC(c, 'Choose an account, or create one. Profiles stay in this browser.', uw / 2, y + 28, '#8b8fa3', 1, drawText);
+    const rowH = 22, start = y + 34, visible = max(1, floor((h - 120) / rowH));
+    UI.scroll = clamp(UI.scroll, 0, max(0, ACCOUNT.profiles.length - visible));
+    for (let i = 0; i < visible; i++) {
+      const p = ACCOUNT.profiles[i + UI.scroll]; if (!p) break;
+      const ry = start + i * rowH, active = ACCOUNT.active && ACCOUNT.active.id === p.id;
+      c.fillStyle = active ? '#3d3320' : inR(x + 6, ry, w - 12, rowH - 4) ? '#2b2740' : '#221e30';
+      c.fillRect(x + 6, ry, w - 12, rowH - 3);
+      c.drawImage(SK[clamp(p.skin | 0, 0, 5)].head, x + 10, ry + 3, 14, 14);
+      drawText(c, p.name, x + 30, ry + 6, active ? '#ffd35a' : '#fff');
+      button(c, x + w - 82, ry + 3, 74, 14, active ? 'ACTIVE' : ACCOUNT.loginId === p.id ? 'SELECTED' : 'SELECT', () => {
+        if (active) { G.state = 'title'; return; }
+        ACCOUNT.loginId = p.id; FORM.accountPassword = ''; FORM.accountConfirm = ''; UI.focus = 'accountPassword'; ACCOUNT.note = '';
+        sfx('ui');
+      }, { off: active });
+    }
+    if (ACCOUNT.profiles.length > visible) drawText(c, `${UI.scroll + 1}-${min(ACCOUNT.profiles.length, UI.scroll + visible)} of ${ACCOUNT.profiles.length} (wheel)`, x + 8, start + visible * rowH + 1, '#6a6485');
+    const selected = ACCOUNT.profiles.find(v => v.id === ACCOUNT.loginId), legacy = selected && (!selected.salt || !selected.hash);
+    if (selected && legacy) {
+      panel(c, x + 8, y + h - 104, w - 16, 76, 'SET PASSWORD');
+      field(c, x + 70, y + h - 82, 94, 'accountPassword', '8+ characters');
+      field(c, x + 70, y + h - 62, 94, 'accountConfirm', 'confirm');
+      button(c, x + w - 92, y + h - 44, 80, 14, ACCOUNT.busy ? 'SAVING...' : 'SAVE + LOG IN', () => {
+        accountSetPassword(selected, FORM.accountPassword, FORM.accountConfirm).then(ok => { if (ok) FORM.accountPassword = FORM.accountConfirm = ''; });
+        sfx('ui');
+      }, { off: ACCOUNT.busy });
+    } else if (selected) {
+      panel(c, x + 8, y + h - 80, w - 16, 52, 'PASSWORD');
+      field(c, x + 16, y + h - 58, 150, 'accountPassword', 'your password');
+      button(c, x + w - 94, y + h - 58, 82, 14, ACCOUNT.busy ? 'CHECKING...' : 'LOG IN', () => {
+        accountLogin(selected, FORM.accountPassword).then(ok => { if (ok) FORM.accountPassword = ''; });
+        sfx('ui');
+      }, { off: ACCOUNT.busy });
+    }
+    button(c, x + 6, y + h - 22, 150, 16, '+ CREATE ACCOUNT', () => {
+      ACCOUNT.loginId = null; ACCOUNT.form = 'create'; FORM.accountName = ''; FORM.accountPassword = ''; FORM.accountConfirm = ''; if (!FORM.skin) FORM.skin = 0; if (!FORM.hat) FORM.hat = 0; UI.focus = 'accountName'; sfx('ui');
+    });
+    if (ACCOUNT.active) button(c, x + w - 66, y + h - 22, 60, 16, 'SIGN OUT', () => { accountLogout(); sfx('ui'); });
+    else textC(c, 'PASSWORD REQUIRED', x + w - 87, y + h - 12, '#6a6485', 1, drawText);
+  }
+  if (ACCOUNT.note) textC(c, ACCOUNT.note, uw / 2, y + h - 3, '#8ff5e6', 1, textO);
 }
 function drawRingForm(c) {
   const uw = VS.uw, uh = VS.uh, w = min(330, uw - 16), h = 214, x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
@@ -9300,6 +9378,7 @@ function drawPause(c) {
   if (!A) button(c, x + w - 112, y + h - 36, 104, 13, netGuest() ? 'LEAVE THEIR WORLD' : COOP.role ? 'PLAY TOGETHER (' + (1 + [...COOP.peers.values()].filter(P => P.ok).length) + ')' : 'PLAY TOGETHER', () => { if (netGuest()) { closeUI(); quitToTitle(); } else { UI.open = 'coop'; COOP.err = ''; sfx('ui'); } });
   button(c, x + 8, y + h - 19, 118, 13, 'CONTROLS: ' + (SETTINGS.combat === 'simple' ? 'SIMPLE' : 'FULL'), () => { SETTINGS.combat = SETTINGS.combat === 'simple' ? 'full' : 'simple'; saveSettings(); sfx('ui'); });
   if (!A) button(c, x + 8, y + h - 36, 118, 13, 'CRAFTING: ' + (SETTINGS.craft === 'hands' ? 'HANDS-ON' : 'SIMPLE'), () => { SETTINGS.craft = SETTINGS.craft === 'hands' ? 'simple' : 'hands'; saveSettings(); UI.job = null; sfx('ui'); });
+  button(c, x + 130, y + h - 36, 118, 13, 'FPS MODE: ' + (SETTINGS.fpsMode ? 'ON' : 'OFF'), () => { SETTINGS.fpsMode = !SETTINGS.fpsMode; if (SETTINGS.fpsMode) G.parts.length = 0; saveSettings(); sfx('ui'); });
   if (!A) button(c, x + 130, y + h - 19, 118, 13, 'DIFFICULTY: ' + DIFF().n, () => { SETTINGS.diff = SETTINGS.diff === 'easy' ? 'normal' : SETTINGS.diff === 'normal' ? 'hard' : 'easy'; saveSettings(); sfx('ui'); });
   const H = ['A / D  move        SPACE or W  jump        SHIFT  dodge', 'LMB  light attack (hold to keep going)   RMB or Q  heavy', ...(SETTINGS.combat === 'simple' ? ['Aim up to launch, aim down or hold S for low blows. Click', 'a creature to punch it, whatever you are holding.'] : ['Where you aim, which keys you hold, whether you are in', 'the air and how far the cursor is all change the attack.']), 'Dodge through a hit at the last moment, then strike: Riposte.', A ? '1-6 weapons    TAB scores    C forms    O sound' : '1-0 / wheel  hotbar     E  pack + crafting     C  forms', A ? 'R  throw sidearm    T  switch sidearm    Echoes leave when a Waker joins.' : 'J  journal + leads   F  talk / use   H  quick heal', A ? '' : 'R  throw sidearm   T  switch sidearm   S held: drop through bridges', A ? '' : 'Ore, keys and such leave your fists free.   K  knap   M  map', A ? '' : 'F beside a station uses it. Hold W/S on ladders. RMB opens doors.', A ? '' : 'V  weapon style (5 per weapon)   X  swap to off hand', A ? '' : 'Tools swing where you point, at rock or beast. Hold RMB: heavy.'];
   H.forEach((l, i) => drawText(c, l, x + 8, y + 42 + i * 12, i === 2 || i === 3 ? '#8ff5e6' : '#d8d4e6'));
@@ -9316,7 +9395,7 @@ function drawDialog(c) {
 }
 function drawUI(c) {
   HITS_NEXT = []; const uw = VS.uw, uh = VS.uh, st = G.state;
-  if (st === 'title') drawTitle(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
+  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
   else if (st === 'loading') { c.fillStyle = 'rgba(18,13,31,.82)'; c.fillRect(0, 0, uw, uh); textC(c, G.loadMsg || 'Loading...', uw / 2, round(uh * .45), '#fff1a8', 1, textO); const n = (performance.now() / 300 | 0) % 4; textC(c, '.'.repeat(n), uw / 2, round(uh * .45) + 12, '#ffd35a', 1, textO); }
   else if (st === 'intro') {
     c.fillStyle = 'rgba(18,13,31,.84)'; c.fillRect(0, 0, uw, uh);
@@ -10153,6 +10232,7 @@ function tickRemote(f) {
 function enterArena(nick, skin, code) {
   if (BR.on) brLeave(); netLeave(); if (COOP.role) coopLeave(); WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0; genArena(); freshSession();
   G.nick = nick; G.skin = skin; NET.rd = 0; NET.roundOver = 0; NET.deathN = 0; NET.kb = ['', 0]; G.echoT = 60;
+  accountSaveProfile();
   inv = new Array(INV_N).fill(null); RING_WEAPONS.forEach((id, i) => inv[i] = { id, n: 1 });
   G.p = newPlayer(); G.fighters = [G.p]; G.npcs = []; G.clock = .57; arenaRespawn(G.p); G.p.inv = 60;
   snapCam(); G.state = 'play'; G.banner = { text: 'THE CINDER RING', sub: NET.room ? 'ring code: ' + (code || 'open') : 'practice with the echoes', t: 0 };
@@ -10897,7 +10977,7 @@ function drawBrForm(c) {
   drawText(c, 'MATCH', fx, y + 70, '#b9bdd0'); field(c, fx + 46, y + 66, fw - 46, 'brcode', 'open  (or a private code)');
   const L = ['Ride the Ember Barge over the island and leap off (SPACE).', 'Open chests (F) for weapons, salves and wards. The ashfall', 'storm closes in from both sides: last one standing wins.', 'Echoes fill any empty places, so a match is never empty.'];
   L.forEach((l, i) => drawText(c, l, fx, y + 92 + i * 10, '#d8d4e6'));
-  const go = (fn) => { UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.nick = nick; G.skin = FORM.skin | 0; G.state = 'loading'; G.loadMsg = 'Raising the island...'; setTimeout(fn, 30); sfx('quest', 0); };
+  const go = (fn) => { UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.nick = nick; G.skin = FORM.skin | 0; accountSaveProfile(); G.state = 'loading'; G.loadMsg = 'Raising the island...'; setTimeout(fn, 30); sfx('quest', 0); };
   let by = y + 140;
   if (NET.room) { button(c, fx, by, fw, 17, 'PLAY ONLINE', () => go(() => brLobbyEnter('room', cleanCode(FORM.brcode) || 'open'))); drawText(c, 'Everyone with this page open on claude.ai who picks the same match meets here.', fx, by + 20, '#8b8fa3'); by += 34; }
   else { drawText(c, 'Online lobby: only on claude.ai (open this page there to find others).', fx, by + 4, '#ffb347'); by += 16; }
@@ -11100,7 +11180,7 @@ async function iceDone(pc, ms) {
 // a direct line (WebRTC) when the networks allow it; otherwise the relay (3-relay.js)
 function wireDC(P, dc) {
   P.dc = dc;
-  dc.onopen = () => { P.open = true; P.heard = performance.now(); if (netGuest() && !P.ok) sendTo(P, { t: 'hello', v: NETV, n: coopName(), sk: G.skin | 0 }); };
+  dc.onopen = () => { P.open = true; P.heard = performance.now(); if (netGuest() && !P.ok) sendTo(P, { t: 'hello', v: NETV, n: coopName(), sk: G.skin | 0, ht: G.hat | 0 }); };
   dc.onclose = () => { if (P.dc === dc) P.dc = null; if (rlyFallback(P)) return; P.open = false; coopLost(P); };
   dc.onmessage = e => { P.heard = performance.now(); try { onRaw(P, e.data); } catch (err) { console.warn('coop', err); } };
 }
@@ -11209,7 +11289,7 @@ function onMsg(P, m, raw) {
   if (!H && COOP.entering && m.t !== 'bye' && m.t !== 'kick') { COOP.backlog.push([P, m, raw]); return; }
   if ((COOP.br || m.t === 'brw') && brRtcMsg(P, m)) return;
   switch (m.t) {
-    case 'hello': if (H && !P.ok && COOP.br) { brRtcWelcome(P, m); return; } if (!H || P.ok) return; P.name = cleanName(m.n) || P.name || 'WAKER'; P.skin = clamp(m.sk | 0, 0, 3); hostWelcome(P); return;
+    case 'hello': if (H && !P.ok && COOP.br) { brRtcWelcome(P, m); return; } if (!H || P.ok) return; P.name = cleanName(m.n) || P.name || 'WAKER'; P.skin = clamp(m.sk | 0, 0, 5); P.hat = clamp(m.ht | 0, 0, 3); hostWelcome(P); return;
     case 'welcome': if (H || COOP.joined) return; guestEnter(m); return;
     case 'me': {
       const id = H ? P.id : m.id; if (!id || id === COOP.me) return; const Q = H ? P : COOP.peers.get(id) || peerFor(id, m);
@@ -11316,12 +11396,12 @@ function fighterState(f, me) {
   const a = f.atk, held = me ? (visHeld(f) || null) : IT[f.wid];
   const o = { x: r1(f.x), y: r1(f.y), vx: r2(f.vx), vy: r2(f.vy), f: f.face, g: f.onGround ? 1 : 0, st: f.dead ? 4 : f.state === 'dodge' ? 2 : f.hurtT > 0 ? 3 : a ? 1 : 0, hp: max(0, round(f.hp)), mhp: round(f.maxhp || 100),
     w: held && held.id ? held.id : '', m: a ? a.id : '', wa: a && a.W ? a.W.id : '', an: f.atkN | 0, mp: a ? a.phase : 0, mt: a ? r1(a.pt) : 0, ma: a ? r2(a.aimA || 0) : 0, md: a ? round(a.dist || 40) : 0, mc: a ? a.charge | 0 : 0, mf: a ? a.face : f.face,
-    tt: f.toolT | 0, tc: f.toolCharge | 0, tw: f.swingTool ? (f.swingTool === HAND ? 'hand' : f.swingTool.id || '') : '', tk: r2(f.toolK || 0), tn: f.throwT | 0, iv: f.inv > 0 || f.iDodge > 0 ? 1 : 0, dd: f.dodgeDir | 0, n: f.name || '', sk: f.skin | 0 };
+    tt: f.toolT | 0, tc: f.toolCharge | 0, tw: f.swingTool ? (f.swingTool === HAND ? 'hand' : f.swingTool.id || '') : '', tk: r2(f.toolK || 0), tn: f.throwT | 0, iv: f.inv > 0 || f.iDodge > 0 ? 1 : 0, dd: f.dodgeDir | 0, n: f.name || '', sk: f.skin | 0, ht: f.hat | 0 };
   if (me) { o.gr = GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : '').join(','); o.d = DIM; if (G.away) o.aw = 1; }
   o.ts = round(performance.now()); return o;
 }
 function makeRemote(Q, s) {
-  const f = newFighter(num(s.x, G.p ? G.p.x : 0), num(s.y, G.p ? G.p.y : 0), { remote: true, coop: true, peer: Q.id, team: 'p', name: cleanName(s.n) || Q.name || 'WAKER', skin: clamp(s.sk | 0, 0, 3), snaps: [], spawnT: 30 });
+  const f = newFighter(num(s.x, G.p ? G.p.x : 0), num(s.y, G.p ? G.p.y : 0), { remote: true, coop: true, peer: Q.id, team: 'p', name: cleanName(s.n) || Q.name || 'WAKER', skin: clamp(s.sk | 0, 0, 5), hat: clamp(s.ht | 0, 0, 3), snaps: [], spawnT: 30 });
   f.wid = ''; Q.f = f; G.fighters.push(f); return f;
 }
 function pushSnap(f, s) {
@@ -11335,7 +11415,7 @@ function pushSnap(f, s) {
     for (const q of S) if (isFinite(q.ts)) q.t = q.ts + f.toff; s.t = s.ts + f.toff; f.delay = clamp((f.gap || 50) + 1.5 * f.jit + 35, 85, 650);
   } else s.t = now;
   S.push(s); if (S.length > 30) S.shift(); f.away = !!s.aw;
-  if (s.n && !f.hollow) f.name = cleanName(s.n) || f.name; if (s.sk !== undefined) f.skin = clamp(s.sk | 0, 0, f.hollow ? 11 : 3);
+  if (s.n && !f.hollow) f.name = cleanName(s.n) || f.name; if (s.sk !== undefined) f.skin = clamp(s.sk | 0, 0, f.hollow ? 11 : 5); if (s.ht !== undefined) f.hat = clamp(s.ht | 0, 0, 3);
   f.hp = num(s.hp, f.hp); f.maxhp = num(s.mhp, f.maxhp || 100); f.inDim = s.d;
   if (s.gr !== undefined && s.gr !== f.grKey) { f.grKey = s.gr; const ids = String(s.gr).split(','); f.gearObj = {}; GEAR_SLOTS.forEach((k, i) => { if (IT[ids[i]] && IT[ids[i]].type === 'armor') f.gearObj[k] = { id: ids[i], n: 1 }; }); f.gskin = null; }
 }
@@ -12160,7 +12240,7 @@ function rlyBegin(P) {
   if (P.relay) return true; if (!rlyCan(P)) return false; const now = performance.now();
   Object.assign(P, { relay: true, rid: netGuest() ? 'h' : P.sig, rq: [], rqK: [], rqs: 0, rs: 0, rw: new Map(), ra: 0, rb: new Map(), rack: 0, rlast: 0, rbusy: false, rAckF: '', rto: 1500, srtt: 0, rT0: now, rHeard: 0 });
   P.open = true; P.heard = now;
-  if (netGuest() && !P.ok) sendTo(P, { t: 'hello', v: NETV, n: coopName(), sk: G.skin | 0 });
+  if (netGuest() && !P.ok) sendTo(P, { t: 'hello', v: NETV, n: coopName(), sk: G.skin | 0, ht: G.hat | 0 });
   return true;
 }
 // what goes out waits here for the next bundle; a newer "where I am" replaces an older one
@@ -12261,16 +12341,134 @@ function pingTick(now) {
 //  (so worlds follow you between devices). Nobody else can read it.
 // ============================================================
 const SAVE = { db: null, uid: null, list: [], busy: false, pending: null, status: 'local', note: '' };
+const ACCOUNT = { profiles: [], active: null, form: 'list', note: '', loginId: null, busy: false };
 const LS = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch (e) { } }
 };
 const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
-const dpath = k => 'data/users/' + SAVE.uid + '/' + k;
-function readLocalIndex() { try { const a = JSON.parse(LS.get('ew2.index') || '[]'); return Array.isArray(a) ? a.filter(m => m && typeof m.id === 'string') : []; } catch (e) { return []; } }
-function writeLocalIndex() { LS.set('ew2.index', JSON.stringify(SAVE.list)); }
+const accountId = () => ACCOUNT.active ? ACCOUNT.active.id : 'none';
+const dpath = (k, owner = accountId()) => 'data/users/' + SAVE.uid + '/accounts/' + owner + '/' + k;
+const profileKey = k => 'ew2.p.' + accountId() + '.' + k;
+const profilePath = (id, k) => 'ew2.p.' + id + '.' + k;
+function readAccountProfiles() { try { const a = JSON.parse(LS.get('ew2.accounts') || '[]'); return Array.isArray(a) ? a.filter(p => p && typeof p.id === 'string' && typeof p.name === 'string') : []; } catch (e) { return []; } }
+function writeAccountProfiles() { return LS.set('ew2.accounts', JSON.stringify(ACCOUNT.profiles)); }
+function accountBoot() {
+  ACCOUNT.profiles = readAccountProfiles();
+  ACCOUNT.active = null; ACCOUNT.loginId = null; ACCOUNT.form = 'list'; ACCOUNT.note = ''; ACCOUNT.busy = false;
+  LS.del('ew2.active');
+  G.nick = 'WAKER'; G.skin = 0; G.hat = 0; SAVE.list = [];
+}
+function cleanAccountName(s) { s = String(s || '').trim().replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 18); return s; }
+function accountSalt() {
+  if (!crypto || !crypto.getRandomValues) throw new Error('Secure password storage is unavailable in this browser.');
+  return [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function accountPasswordHash(password, saltHex) {
+  if (!crypto || !crypto.subtle || !window.TextEncoder) throw new Error('Secure password storage is unavailable in this browser.');
+  const salt = Uint8Array.from(saltHex.match(/../g), b => parseInt(b, 16));
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 120000, hash: 'SHA-256' }, key, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function accountPasswordValid(password, confirm) {
+  if (String(password || '').length < 8) { ACCOUNT.note = 'Use a password with at least 8 characters.'; return false; }
+  if (password !== confirm) { ACCOUNT.note = 'Those passwords do not match.'; return false; }
+  return true;
+}
+function migrateGuestWorlds() {
+  const oldIndex = LS.get(profilePath('guest', 'index')) || LS.get('ew2.index');
+  if (!oldIndex || LS.get(profilePath(accountId(), 'index')) !== null) return;
+  let worlds;
+  try { worlds = JSON.parse(oldIndex); } catch (e) { return; }
+  if (!Array.isArray(worlds)) return;
+  SAVE.list = worlds.filter(m => m && typeof m.id === 'string');
+  for (const m of SAVE.list) {
+    const raw = LS.get(profilePath('guest', 'w.' + m.id)) || LS.get('ew2.w.' + m.id);
+    if (raw !== null && LS.get(profilePath(accountId(), 'w.' + m.id)) === null) LS.set(profilePath(accountId(), 'w.' + m.id), raw);
+  }
+  writeLocalIndex(); sortWorlds();
+}
+async function accountCreate(name, password, confirm, skin, hat) {
+  name = cleanAccountName(name);
+  if (!name) { ACCOUNT.note = 'Enter an account name.'; return false; }
+  if (ACCOUNT.profiles.some(p => p.name.toLowerCase() === name.toLowerCase())) { ACCOUNT.note = 'That account name is already in use.'; return false; }
+  if (!accountPasswordValid(password, confirm)) return false;
+  if (ACCOUNT.busy) return false;
+  ACCOUNT.busy = true; ACCOUNT.note = '';
+  try {
+    const salt = accountSalt(), hash = await accountPasswordHash(password, salt);
+    const firstAccount = !ACCOUNT.profiles.some(p => p.id !== 'guest');
+    const p = { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name, skin: clamp(skin | 0, 0, 5), hat: clamp(hat | 0, 0, 3), salt, hash };
+    ACCOUNT.profiles.push(p);
+    if (!writeAccountProfiles()) { ACCOUNT.profiles.pop(); ACCOUNT.note = 'Could not save this account in this browser.'; return false; }
+    accountSwitch(p.id);
+    if (firstAccount) migrateGuestWorlds();
+    ACCOUNT.note = 'Account created. Saves stay in this browser unless cloud saving is available.';
+    G.state = 'title'; ACCOUNT.form = 'list'; ACCOUNT.loginId = null;
+    return true;
+  } catch (e) {
+    ACCOUNT.note = e && e.message ? e.message : 'Could not create the account.';
+    return false;
+  } finally { ACCOUNT.busy = false; }
+}
+function accountSwitch(id) {
+  const p = ACCOUNT.profiles.find(v => v.id === id); if (!p) return false;
+  ACCOUNT.active = p; LS.del('ew2.active'); G.nick = p.name; G.skin = clamp(p.skin | 0, 0, 5); G.hat = clamp(p.hat | 0, 0, 3);
+  if (FORM) { FORM.nick = p.name; FORM.skin = G.skin; FORM.hat = G.hat; }
+  SAVE.list = readLocalIndex(); sortWorlds(); ACCOUNT.note = 'Logged in as ' + p.name + '.';
+  saveBoot();
+  return true;
+}
+async function accountSetPassword(p, password, confirm) {
+  if (!p || !accountPasswordValid(password, confirm) || ACCOUNT.busy) return false;
+  ACCOUNT.busy = true; ACCOUNT.note = '';
+  try {
+    p.salt = accountSalt(); p.hash = await accountPasswordHash(password, p.salt); delete p.pin;
+    if (!writeAccountProfiles()) { delete p.salt; delete p.hash; ACCOUNT.note = 'Could not save this account in this browser.'; return false; }
+    accountSwitch(p.id); G.state = 'title'; ACCOUNT.form = 'list'; return true;
+  } catch (e) {
+    ACCOUNT.note = e && e.message ? e.message : 'Could not set the account password.';
+    return false;
+  } finally { ACCOUNT.busy = false; }
+}
+async function accountLogin(p, password) {
+  if (!p || ACCOUNT.busy) return false;
+  if (!p.salt || !p.hash) { ACCOUNT.note = 'Set a password for this older account to continue.'; return false; }
+  ACCOUNT.busy = true; ACCOUNT.note = '';
+  try {
+    const hash = await accountPasswordHash(String(password || ''), p.salt);
+    if (hash !== p.hash) { ACCOUNT.note = 'Wrong password.'; return false; }
+    accountSwitch(p.id); G.state = 'title'; ACCOUNT.form = 'list'; return true;
+  } catch (e) {
+    ACCOUNT.note = e && e.message ? e.message : 'Could not log in.';
+    return false;
+  } finally { ACCOUNT.busy = false; }
+}
+function accountLogout() {
+  if (G.state === 'play' && WORLD.id && !WORLD.arena) saveWorld(true);
+  if (COOP.role) coopLeave();
+  ACCOUNT.active = null; ACCOUNT.loginId = null; ACCOUNT.form = 'list'; ACCOUNT.note = 'Signed out.';
+  SAVE.list = []; LS.del('ew2.active');
+  G.state = 'accounts'; UI.open = null; UI.focus = null; UI.held = null;
+}
+function accountSaveProfile() {
+  if (!ACCOUNT.active) return;
+  ACCOUNT.active.skin = G.skin; ACCOUNT.active.hat = G.hat; ACCOUNT.active.name = G.nick || ACCOUNT.active.name;
+  writeAccountProfiles();
+}
+function readLocalIndex() {
+  try {
+    const own = LS.get(profileKey('index'));
+    const raw = own !== null ? own : (accountId() === 'guest' ? LS.get('ew2.index') : null);
+    const a = JSON.parse(raw || '[]'); return Array.isArray(a) ? a.filter(m => m && typeof m.id === 'string') : [];
+  } catch (e) { return []; }
+}
+function writeLocalIndex() { LS.set(profileKey('index'), JSON.stringify(SAVE.list)); }
 function saveBoot() {
+  if (!ACCOUNT.active) return;
+  const owner = accountId();
   SAVE.list = readLocalIndex(); sortWorlds();
   try {
     if (!(window.claude && window.claude.use)) return;
@@ -12278,16 +12476,17 @@ function saveBoot() {
       if (!user || !db) return; const uid = await user.id(); if (!uid) return;
       SAVE.db = db; SAVE.uid = uid; SAVE.status = 'syncing';
       try {
-        const snap = await withTimeout(db.doc(dpath('index')).get(), 9000);
+        const snap = await withTimeout(db.doc(dpath('index', owner)).get(), 9000);
+        if (accountId() !== owner) return;
         const remote = snap && snap.exists && Array.isArray((snap.data() || {}).worlds) ? snap.data().worlds : [];
         for (const m of remote) { if (!m || typeof m.id !== 'string') continue; const i = SAVE.list.findIndex(l => l.id === m.id); if (i < 0) SAVE.list.push(Object.assign({}, m, { cloud: true })); else if ((m.savedAt || 0) > (SAVE.list[i].savedAt || 0)) SAVE.list[i] = Object.assign({}, m, { cloud: true }); else SAVE.list[i].cloud = true; }
         sortWorlds(); writeLocalIndex(); SAVE.status = 'cloud';
-      } catch (e) { SAVE.status = 'cloud'; }
+      } catch (e) { if (accountId() === owner) SAVE.status = 'cloud'; }
     }, () => { });
   } catch (e) { }
 }
 function sortWorlds() { SAVE.list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)); }
-function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
+function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, hat: G.hat, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
 function snapshotWorld() {
   const p = G.p;
   return Object.assign(worldMeta(), {
@@ -12300,52 +12499,60 @@ function snapshotWorld() {
 function saveWorld(quiet) {
   if (WORLD.arena || WORLD.guest || !WORLD.id || (G.state !== 'play' && G.state !== 'intro') || !G.p) return;
   const data = snapshotWorld(), meta = worldMeta();
-  const okLocal = LS.set('ew2.w.' + WORLD.id, JSON.stringify(data));
+  const okLocal = LS.set(profileKey('w.' + WORLD.id), JSON.stringify(data));
   const i = SAVE.list.findIndex(m => m.id === WORLD.id); if (i < 0) SAVE.list.unshift(meta); else SAVE.list[i] = Object.assign(SAVE.list[i], meta);
   sortWorlds(); writeLocalIndex(); G.dirty = false; G.saveT = 0;
-  if (SAVE.db) { SAVE.pending = data; if (!SAVE.busy) pumpSaves(); }
+  if (SAVE.db) { SAVE.pending = { data, owner: accountId(), worlds: SAVE.list.map(m => Object.assign({}, m)) }; if (!SAVE.busy) pumpSaves(); }
   if (!quiet) G.savedNote = { t: 0, ok: okLocal || !!SAVE.db };
 }
 async function pumpSaves() {
   SAVE.busy = true;
   while (SAVE.pending && SAVE.db) {
-    const data = SAVE.pending; SAVE.pending = null;
+    const pending = SAVE.pending, data = pending.data, owner = pending.owner; SAVE.pending = null;
     try {
       const mods = data.mods || '', parts = []; for (let i = 0; i < mods.length; i += 180000) parts.push(mods.slice(i, i + 180000));
-      for (let k = 0; parts.length > 1 && k < parts.length; k++) await withTimeout(SAVE.db.doc(dpath('w-' + data.id + '-m' + k)).set({ s: parts[k] }), 15000);
-      await withTimeout(SAVE.db.doc(dpath('w-' + data.id)).set(Object.assign({}, data, { mods: parts.length > 1 ? '' : mods, mparts: parts.length > 1 ? parts.length : 0 })), 15000);
-      const m = SAVE.list.find(l => l.id === data.id); if (m) m.cloud = true;
-      await withTimeout(SAVE.db.doc(dpath('index')).set({ worlds: SAVE.list.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) }), 15000);
-      SAVE.status = 'cloud';
+      for (let k = 0; parts.length > 1 && k < parts.length; k++) await withTimeout(SAVE.db.doc(dpath('w-' + data.id + '-m' + k, owner)).set({ s: parts[k] }), 15000);
+      await withTimeout(SAVE.db.doc(dpath('w-' + data.id, owner)).set(Object.assign({}, data, { mods: parts.length > 1 ? '' : mods, mparts: parts.length > 1 ? parts.length : 0 })), 15000);
+      const m = pending.worlds.find(l => l.id === data.id); if (m) m.cloud = true;
+      await withTimeout(SAVE.db.doc(dpath('index', owner)).set({ worlds: pending.worlds.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) }), 15000);
+      if (accountId() === owner) SAVE.status = 'cloud';
     } catch (e) {
-      const c = e && e.code; SAVE.status = c === 'quota_exceeded' ? 'cloud full' : 'local';
+      const c = e && e.code; if (accountId() === owner) SAVE.status = c === 'quota_exceeded' ? 'cloud full' : 'local';
       if (c === 'invalid_argument' || c === 'revoked' || c === 'not_granted' || c === 'quota_exceeded') SAVE.db = null;
     }
   }
   SAVE.busy = false;
 }
 async function loadWorldData(id) {
-  let local = null; try { local = JSON.parse(LS.get('ew2.w.' + id) || 'null'); } catch (e) { }
+  const owner = accountId();
+  let local = null;
+  try {
+    const own = LS.get(profileKey('w.' + id));
+    const raw = own !== null ? own : (accountId() === 'guest' ? LS.get('ew2.w.' + id) : null);
+    local = JSON.parse(raw || 'null');
+  } catch (e) { }
   let remote = null;
   if (SAVE.db) {
     try {
-      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000);
+      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id, owner)).get(), 9000);
       if (s && s.exists) {
         remote = Object.assign({}, s.data());
-        if (remote.mparts > 0) { let m = ''; for (let k = 0; k < remote.mparts; k++) { const ps = await withTimeout(SAVE.db.doc(dpath('w-' + id + '-m' + k)).get(), 9000); m += ps && ps.exists ? (ps.data().s || '') : ''; } remote.mods = m; }
+        if (remote.mparts > 0) { let m = ''; for (let k = 0; k < remote.mparts; k++) { const ps = await withTimeout(SAVE.db.doc(dpath('w-' + id + '-m' + k, owner)).get(), 9000); m += ps && ps.exists ? (ps.data().s || '') : ''; } remote.mods = m; }
       }
     } catch (e) { }
   }
   return remote && (!local || (remote.savedAt || 0) > (local.savedAt || 0)) ? remote : local;
 }
 function deleteWorld(id) {
-  const m = SAVE.list.find(l => l.id === id); SAVE.list = SAVE.list.filter(l => l.id !== id); writeLocalIndex(); LS.del('ew2.w.' + id);
+  const owner = accountId();
+  const m = SAVE.list.find(l => l.id === id); SAVE.list = SAVE.list.filter(l => l.id !== id); writeLocalIndex(); LS.del(profileKey('w.' + id)); if (accountId() === 'guest') LS.del('ew2.w.' + id);
+  const worlds = SAVE.list.map(l => Object.assign({}, l));
   if (SAVE.db && m) (async () => {
     try {
-      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id)).get(), 9000); const n = s && s.exists ? (s.data().mparts || 0) : 0;
-      for (let k = 0; k < n; k++) await SAVE.db.doc(dpath('w-' + id + '-m' + k)).delete();
-      await SAVE.db.doc(dpath('w-' + id)).delete();
-      await SAVE.db.doc(dpath('index')).set({ worlds: SAVE.list.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) });
+      const s = await withTimeout(SAVE.db.doc(dpath('w-' + id, owner)).get(), 9000); const n = s && s.exists ? (s.data().mparts || 0) : 0;
+      for (let k = 0; k < n; k++) await SAVE.db.doc(dpath('w-' + id + '-m' + k, owner)).delete();
+      await SAVE.db.doc(dpath('w-' + id, owner)).delete();
+      await SAVE.db.doc(dpath('index', owner)).set({ worlds: worlds.map(l => { const c = Object.assign({}, l); delete c.cloud; return c; }) });
     } catch (e) { }
   })();
 }
@@ -12356,14 +12563,14 @@ function seedFrom(text) {
 const FORGE_KIT_OLD = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku', 'pick2', 'torch', 'plank', 'brick', 'platform', 'dirt', 'stone', 'sandstone', 'snow', 'sand', 'ash', 'deepstone', 'bench', 'furnace', 'salve', 'kblade', 'kmaul', 'vpike', 'vfangs', 'shuriken', 'hook', 'flask', 'smoke'];
 function createWorld(o) {
   Object.assign(WORLD, { id: Date.now().toString(36) + ((Math.random() * 46656) | 0).toString(36), name: o.name || 'Aldermere', seed: seedFrom(o.seed), size: o.size, shape: o.shape, mode: o.mode, arena: false });
-  G.skin = o.skin; startWorld(null);
+  G.skin = o.skin; G.hat = o.hat || 0; accountSaveProfile(); startWorld(null);
 }
 async function openWorld(meta) {
   G.state = 'loading'; G.loadMsg = 'Opening ' + meta.name + '...';
   const data = await loadWorldData(meta.id);
   if (!data) { SAVE.list = SAVE.list.filter(l => l.id !== meta.id); writeLocalIndex(); G.state = 'worlds'; G.menuNote = 'That world could not be found.'; return; }
   Object.assign(WORLD, { id: data.id, name: data.name, seed: data.seed | 0, size: clamp(data.size | 0, 0, 2), shape: clamp(data.shape | 0, 0, 2), mode: data.mode ? 1 : 0, arena: false });
-  G.skin = clamp(data.skin | 0, 0, 3); startWorld(data);
+  G.skin = clamp(data.skin | 0, 0, 5); G.hat = clamp(data.hat | 0, 0, 3); accountSaveProfile(); startWorld(data);
 }
 function startWorld(data) {
   G.state = 'loading'; G.loadMsg = data ? 'Rebuilding ' + WORLD.name + '...' : 'Forging ' + WORLD.name + '...';
@@ -12981,14 +13188,18 @@ addEventListener('keydown', e => {
     if (!e.metaKey && !e.ctrlKey) e.preventDefault();
     if (k === 'Backspace') { FORM[UI.focus] = FORM[UI.focus].slice(0, -1); e.preventDefault(); return; }
     if (k === 'Enter' || k === 'Tab' || k === 'Escape') { UI.focus = null; e.preventDefault(); return; }
-    if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey) { const lim = UI.focus === 'name' ? 24 : UI.focus === 'seed' ? 18 : UI.focus === 'gcode' ? 6 : 12; if (FORM[UI.focus].length < lim && /[A-Za-z0-9 _\-'.]/.test(e.key)) FORM[UI.focus] += UI.focus === 'nick' ? e.key.toUpperCase() : UI.focus === 'code' ? e.key.toLowerCase() : e.key; e.preventDefault(); }
+    if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+      const password = UI.focus === 'accountPassword' || UI.focus === 'accountConfirm', lim = password ? 64 : UI.focus === 'name' ? 24 : UI.focus === 'seed' ? 18 : UI.focus === 'gcode' ? 6 : 12;
+      if (FORM[UI.focus].length < lim && (password ? !/[\u0000-\u001f]/.test(e.key) : /[A-Za-z0-9 _\-'.]/.test(e.key))) FORM[UI.focus] += UI.focus === 'nick' ? e.key.toUpperCase() : UI.focus === 'code' ? e.key.toLowerCase() : e.key;
+      e.preventDefault();
+    }
     return;
   }
   if (!e.ctrlKey && !e.metaKey && (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape', 'ShiftLeft', 'ShiftRight', 'Backspace'].includes(k) || k.startsWith('Key') || k.startsWith('Digit'))) e.preventDefault();
   if (e.repeat) return; keys[k] = true; pressed[k] = true;
   if (G.state === 'intro') { if (k === 'Enter' || k === 'Space') { audioInit(); advance(); } return; }
   if (G.state === 'brlobby') { if (k === 'Escape') { brLeave(); sfx('ui'); } return; }
-  if (G.state !== 'play') { if (k === 'Escape') { G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
+  if (G.state !== 'play') { if (k === 'Escape') { if (G.state === 'accounts' && !ACCOUNT.active) return; G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'accounts') ACCOUNT.form = 'list'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
   if (G.dialog) { if (k === 'KeyF' || k === 'Space' || k === 'Enter' || k === 'KeyE') { dialogAdvance(); pressed[k] = false; } return; }
   if (k === 'Escape' || k === 'KeyP') { if (UI.open) { closeUI(); sfx('ui'); } else toggleUI('pause'); return; }
   if ((k === 'Enter' || k === 'NumpadEnter') && chatKey()) return;
@@ -13018,7 +13229,7 @@ addEventListener('mouseup', e => { if (e.button === 0) { mouse.l = false; mouse.
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   e.preventDefault(); const d = sign(e.deltaY);
-  if (G.state === 'worlds') { UI.scroll = max(0, UI.scroll + d); return; }
+  if (G.state === 'worlds' || G.state === 'accounts') { UI.scroll = max(0, UI.scroll + d); return; }
   if (G.state !== 'play') return;
   if (UI.open === 'map') mapZoom(d);
   else if (UI.open) UI.scroll = max(0, UI.scroll + d * (UI.open === 'inv' ? 1 : 2));
@@ -13037,10 +13248,10 @@ addEventListener('pagehide', e => {
 buildTiles(); buildTiles2(); buildSprites(); buildSprites2(); buildTiles3(); buildMobSprites(); buildDimArt(); buildPlaceArt(); buildBenchArt(); buildFurnArt(); buildDimMobs(); dimItemsPre(); buildItems(); brItems(); resize(); buildBayer();
 SIL = [genSil(31, 0), genSil(77, 1)]; for (let i = 0; i < 4; i++) VEILS.push(genVeil(i * 17));
 SHARDMOON = spr(['.....w.....', '....wWc....', '....WWc....', '...wWWcc...', '...WWWcc...', '..wWWWccc..', '..WWWWccd..', '.wWWWWcccd.', '..WWWccdd..', '..WWWcccd..', '...WWccd...', '...Wcccd...', '....ccd....', '....cd.....', '.....d.....'], { w: '#ffffff', W: '#dcf7f5', c: '#8fd0d8', d: '#62a9bc' });
-saveBoot(); netBoot();
+accountBoot(); netBoot();
 Object.assign(WORLD, { id: '', name: 'Aldermere', seed: (Math.random() * 1e9) | 0, size: 0, shape: (Math.random() * 3) | 0, mode: 0, arena: false });
 SEED = WORLD.seed; genWorld(); freshSession(); G.p = newPlayer(); G.fighters = [G.p]; spawnNPCs(); G.clock = .3; updateSun();
-G.state = 'title'; G.cam.x = G.cam.px = camX((SPAWN_X - 70) * T); G.cam.y = G.cam.py = camY(heights[SPAWN_X - 40] * T - VS.vh * .62);
+G.state = 'accounts'; G.cam.x = G.cam.px = camX((SPAWN_X - 70) * T); G.cam.y = G.cam.py = camY(heights[SPAWN_X - 40] * T - VS.vh * .62);
 requestAnimationFrame(frame);
 
 </script>

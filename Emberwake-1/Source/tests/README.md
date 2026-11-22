@@ -30,6 +30,7 @@ The multiplayer tests run several game windows on one computer and stand in for 
 
 Story, screens, controls, the pack and crafting.
 
+- `accounts.py` Password-required accounts, signing out on restart, guest-save migration and separate profile saves.
 - `benches_and_trinkets.py` The benches (each opens and lists its own work), trinkets made, worn and felt, a meal's boon, storage of three sizes kept through a save, planters, the bed, the ballista and traps, and the guardians' offerings.
 - `controls_and_settings.py` Simple controls (fists, chains), difficulty, FPS mode, digging by hand, knapping, and the menu settings.
 - `crafting.py` Crafting with the real mouse: a hand recipe from the pack, a plank at the workbench (one click, no mini-game).

@@ -57,7 +57,7 @@ async def main():
     res['ashen offering recipe'] = await h.ev("JSON.stringify(RECIPES.find(r => r.out === 'ashen_offering').need) + ' at ' + RECIPES.find(r => r.out === 'ashen_offering').st")
     res['shepherd only for a called moon'] = await h.ev("(() => { const t = eventTick.toString(); return t.includes('e.called'); })()")
     # ---- save and load: trinkets, meal, strongbox ----
-    res['after a save and load'] = await h.ev("""(async () => { %s const bx = tx + 4, by = ty; saveWorld(true); const id = WORLD.id, meta = JSON.parse(localStorage.getItem('ew2.index')).find(m => m.id === id);
+    res['after a save and load'] = await h.ev("""(async () => { %s const bx = tx + 4, by = ty; saveWorld(true); const id = WORLD.id, meta = JSON.parse(localStorage.getItem(profileKey('index'))).find(m => m.id === id);
       if (!meta) return 'no save'; quitToTitle(); await new Promise(r => setTimeout(r, 200)); await openWorld(meta); await new Promise(r => setTimeout(r, 500)); if (G.state === 'intro') beginPlay(false);
       const s = STN.get(by * WW + bx); return [G.trink.filter(Boolean), G.meal && G.meal.k, s ? s.items.length : 'no box', s && s.items[25] ? s.items[25].n : 0, G.rest > 0]; })()""" % here)
     await h.ev("G.cine = null; G.dialog = null; G.p.inv = 1e9;")

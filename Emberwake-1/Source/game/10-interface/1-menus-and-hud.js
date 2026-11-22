@@ -4,7 +4,7 @@
 //  a hit box while it draws; clicks test last frame's boxes.
 // ============================================================
 const inR = (x, y, w, h) => mouse.ux >= x && mouse.ux < x + w && mouse.uy >= y && mouse.uy < y + h;
-const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', accountName: '', accountPin: '' };
+const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', accountName: '', accountPassword: '', accountConfirm: '' };
 const SIZE_D = ['600 x 260 tiles', '900 x 320 tiles', '1400 x 380 tiles', '2200 x 440 tiles: days to cross'], SHAPE_D = ['every seed deals its lands in a new order', 'the Drift is crowded with islands', 'few islands, the Underdark yawns wider'], MODE_D = ['three embers, any order, nothing forced', 'every item, no monsters, build freely'];
 let HITS = [], HITS_NEXT = [];
 const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!slot });
@@ -21,7 +21,7 @@ function button(c, x, y, w, h, label, fn, o = {}) {
   if (!o.off) hit(x, y, w, h, fn);
 }
 function field(c, x, y, w, key, ph) {
-  const f = UI.focus === key, v = FORM[key];
+  const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
   if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
   if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
@@ -184,47 +184,64 @@ function drawCreate(c) {
   button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { G.state = 'worlds'; UI.focus = null; sfx('ui'); });
 }
 function drawAccounts(c) {
-  const uw = VS.uw, uh = VS.uh, w = min(340, uw - 16), h = min(240, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  const uw = VS.uw, uh = VS.uh, w = min(340, uw - 16), h = min(260, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'ACCOUNTS');
   const fx = x + 10, fw = w - 20;
   if (ACCOUNT.form === 'create') {
     drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'accountName', 'account name');
-    drawText(c, 'PIN', fx, y + 42, '#b9bdd0'); field(c, fx + 46, y + 38, fw - 46, 'accountPin', 'optional numbers');
-    skinPicker(c, fx, y + 58);
-    hatPicker(c, fx, y + 88);
-    button(c, x + 10, y + h - 26, 150, 18, 'CREATE ACCOUNT', () => {
+    drawText(c, 'PASS', fx, y + 42, '#b9bdd0'); field(c, fx + 46, y + 38, fw - 46, 'accountPassword', '8 characters minimum');
+    drawText(c, 'AGAIN', fx, y + 62, '#b9bdd0'); field(c, fx + 46, y + 58, fw - 46, 'accountConfirm', 'confirm password');
+    skinPicker(c, fx, y + 78);
+    hatPicker(c, fx, y + 108);
+    button(c, x + 10, y + h - 26, 150, 18, ACCOUNT.busy ? 'CREATING...' : 'CREATE ACCOUNT', () => {
       UI.focus = null;
-      accountCreate(FORM.accountName, FORM.accountPin, FORM.skin, FORM.hat);
-      G.skin = FORM.skin; G.hat = FORM.hat; G.nick = ACCOUNT.active.name;
-      ACCOUNT.form = 'list';
+      accountCreate(FORM.accountName, FORM.accountPassword, FORM.accountConfirm, FORM.skin, FORM.hat).then(ok => {
+        if (ok) { G.skin = FORM.skin; G.hat = FORM.hat; G.nick = ACCOUNT.active.name; FORM.accountPassword = FORM.accountConfirm = ''; }
+      });
       sfx('quest', 0);
-    });
+    }, { off: ACCOUNT.busy });
     button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
   } else {
-    const rowH = 28, start = y + 18;
-    for (let i = 0; i < ACCOUNT.profiles.length; i++) {
-      const p = ACCOUNT.profiles[i], ry = start + i * rowH, active = ACCOUNT.active && ACCOUNT.active.id === p.id;
+    textC(c, 'SIGN IN TO CONTINUE', uw / 2, y + 17, '#b9bdd0', 1, drawText);
+    textC(c, 'Choose an account, or create one. Profiles stay in this browser.', uw / 2, y + 28, '#8b8fa3', 1, drawText);
+    const rowH = 22, start = y + 34, visible = max(1, floor((h - 120) / rowH));
+    UI.scroll = clamp(UI.scroll, 0, max(0, ACCOUNT.profiles.length - visible));
+    for (let i = 0; i < visible; i++) {
+      const p = ACCOUNT.profiles[i + UI.scroll]; if (!p) break;
+      const ry = start + i * rowH, active = ACCOUNT.active && ACCOUNT.active.id === p.id;
       c.fillStyle = active ? '#3d3320' : inR(x + 6, ry, w - 12, rowH - 4) ? '#2b2740' : '#221e30';
       c.fillRect(x + 6, ry, w - 12, rowH - 3);
-      c.drawImage(SK[clamp(p.skin | 0, 0, 5)].head, x + 10, ry + 5, 14, 14);
-      drawText(c, p.name, x + 30, ry + 7, active ? '#ffd35a' : '#fff');
-      button(c, x + w - 82, ry + 4, 74, 14, active ? 'ACTIVE' : p.pin ? 'PIN + LOGIN' : 'LOGIN', () => {
+      c.drawImage(SK[clamp(p.skin | 0, 0, 5)].head, x + 10, ry + 3, 14, 14);
+      drawText(c, p.name, x + 30, ry + 6, active ? '#ffd35a' : '#fff');
+      button(c, x + w - 82, ry + 3, 74, 14, active ? 'ACTIVE' : ACCOUNT.loginId === p.id ? 'SELECTED' : 'SELECT', () => {
         if (active) { G.state = 'title'; return; }
-        if (p.pin) { ACCOUNT.form = 'pin'; ACCOUNT.loginId = p.id; FORM.accountPin = ''; UI.focus = 'accountPin'; } else accountLogin(p, '');
+        ACCOUNT.loginId = p.id; FORM.accountPassword = ''; FORM.accountConfirm = ''; UI.focus = 'accountPassword'; ACCOUNT.note = '';
         sfx('ui');
       }, { off: active });
     }
-    if (ACCOUNT.form === 'pin') {
-      const p = ACCOUNT.profiles.find(v => v.id === ACCOUNT.loginId);
-      panel(c, x + 8, y + h - 76, w - 16, 48, 'ENTER PIN');
-      drawText(c, p ? p.name : 'Account', x + 16, y + h - 54, '#b9bdd0');
-      field(c, x + 70, y + h - 58, 70, 'accountPin', 'numbers');
-      button(c, x + w - 94, y + h - 58, 84, 14, 'LOG IN', () => { const q = ACCOUNT.profiles.find(v => v.id === ACCOUNT.loginId); if (q) accountLogin(q, FORM.accountPin); if (G.state === 'accounts') ACCOUNT.form = 'list'; sfx('ui'); });
+    if (ACCOUNT.profiles.length > visible) drawText(c, `${UI.scroll + 1}-${min(ACCOUNT.profiles.length, UI.scroll + visible)} of ${ACCOUNT.profiles.length} (wheel)`, x + 8, start + visible * rowH + 1, '#6a6485');
+    const selected = ACCOUNT.profiles.find(v => v.id === ACCOUNT.loginId), legacy = selected && (!selected.salt || !selected.hash);
+    if (selected && legacy) {
+      panel(c, x + 8, y + h - 104, w - 16, 76, 'SET PASSWORD');
+      field(c, x + 70, y + h - 82, 94, 'accountPassword', '8+ characters');
+      field(c, x + 70, y + h - 62, 94, 'accountConfirm', 'confirm');
+      button(c, x + w - 92, y + h - 44, 80, 14, ACCOUNT.busy ? 'SAVING...' : 'SAVE + LOG IN', () => {
+        accountSetPassword(selected, FORM.accountPassword, FORM.accountConfirm).then(ok => { if (ok) FORM.accountPassword = FORM.accountConfirm = ''; });
+        sfx('ui');
+      }, { off: ACCOUNT.busy });
+    } else if (selected) {
+      panel(c, x + 8, y + h - 80, w - 16, 52, 'PASSWORD');
+      field(c, x + 16, y + h - 58, 150, 'accountPassword', 'your password');
+      button(c, x + w - 94, y + h - 58, 82, 14, ACCOUNT.busy ? 'CHECKING...' : 'LOG IN', () => {
+        accountLogin(selected, FORM.accountPassword).then(ok => { if (ok) FORM.accountPassword = ''; });
+        sfx('ui');
+      }, { off: ACCOUNT.busy });
     }
     button(c, x + 6, y + h - 22, 150, 16, '+ CREATE ACCOUNT', () => {
-      ACCOUNT.form = 'create'; FORM.accountName = ''; FORM.accountPin = ''; if (!FORM.skin) FORM.skin = 0; if (!FORM.hat) FORM.hat = 0; UI.focus = 'accountName'; sfx('ui');
+      ACCOUNT.loginId = null; ACCOUNT.form = 'create'; FORM.accountName = ''; FORM.accountPassword = ''; FORM.accountConfirm = ''; if (!FORM.skin) FORM.skin = 0; if (!FORM.hat) FORM.hat = 0; UI.focus = 'accountName'; sfx('ui');
     });
-    button(c, x + w - 66, y + h - 22, 60, 16, 'BACK', () => { G.state = 'title'; ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
+    if (ACCOUNT.active) button(c, x + w - 66, y + h - 22, 60, 16, 'SIGN OUT', () => { accountLogout(); sfx('ui'); });
+    else textC(c, 'PASSWORD REQUIRED', x + w - 87, y + h - 12, '#6a6485', 1, drawText);
   }
   if (ACCOUNT.note) textC(c, ACCOUNT.note, uw / 2, y + h - 3, '#8ff5e6', 1, textO);
 }
