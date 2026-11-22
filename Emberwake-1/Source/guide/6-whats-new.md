@@ -2,6 +2,12 @@
 
 Newest first.
 
+## Local accounts, achievements and looks
+
+- **Username and password sign-in** finds an account saved in this browser or app. Your profile, worlds, coins, achievements and cosmetics are local; there is no online account recovery or cross-device profile sync.
+- **Customization + Achievements** on the title screen includes a coin shop for skins and hats. Earn coins for one-time milestones such as saving a world, defeating creatures, crafting and adding a saved friend.
+- **Saved friends** keep a name and a world code with your local profile. Join by that code and use the built-in chat once you are together. There is no global friend directory, offline messaging or all-world activity presence.
+
 ## Benches, trinkets, guardians and a bigger world
 
 - **Ten benches, each with one job:** the Workbench, a new **Carpenter's Table**, the Anvil, a new **Armourer's Stand**, a new **Tinker's Table**, a new **Jeweller's Bench**, a new **Hearth Oven**, the Cauldron, a new **Offering Altar** and the Mason's Bench, plus the workshops for materials. Crafting by hand from your pack is still there.
@@ -29,7 +35,7 @@ Newest first.
 - **PLAY TOGETHER** shows how each friend is connected and how quick the line is.
 - The world keeps running when someone switches to another window, and their Waker rests safely meanwhile (the Mac app keeps running when hidden too).
 - Fixes: doors no longer shut on a friend standing in them; explosions hurt everyone nearby and hit creatures once; a newly placed campfire or kiln is the same for everyone; chests and fires are used one person at a time, so nothing is doubled or lost; a friend joining while others moved no longer sees a frozen, nameless Waker; closing the window tells friends at once.
-- **FPS mode:** turn off ambient and particle effects in the pause menu for a simpler, smoother picture on slower computers. It does not change gameplay or multiplayer simulation.
+- **FPS mode:** turn off ambient and particle effects and simplify lighting in the pause menu for a simpler, smoother picture on slower computers. It does not change gameplay or multiplayer simulation.
 
 ## Game codes, easier packs and crafting
 

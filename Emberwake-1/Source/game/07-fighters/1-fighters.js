@@ -3,7 +3,7 @@
 //  other people online all use this one body: movement, dodge,
 //  perfect dodge, hit reactions and the pixel-rig renderer.
 // ============================================================
-const UI = { open: null, held: null, scroll: 0, codex: null, focus: null, confirm: null };
+const UI = { open: null, held: null, scroll: 0, codex: null, focus: null, confirm: null, customTab: 'shop' };
 const VS = { s: 3, W: 0, H: 0, vw: 0, vh: 0, ui: 2, uw: 0, uh: 0 };
 const heldItem = () => { const s = inv[G.sel]; return s ? IT[s.id] : null; };
 const NOFOES = [];

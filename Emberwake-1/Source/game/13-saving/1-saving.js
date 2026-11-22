@@ -6,6 +6,24 @@
 // ============================================================
 const SAVE = { db: null, uid: null, list: [], busy: false, pending: null, status: 'local', note: '' };
 const ACCOUNT = { profiles: [], active: null, form: 'list', note: '', loginId: null, busy: false };
+const FRIENDS = { note: '' };
+const COSMETICS = [
+  { type: 'skin', id: 0, name: 'ASH', price: 0 }, { type: 'skin', id: 1, name: 'EMBER', price: 30 },
+  { type: 'skin', id: 2, name: 'TIDE', price: 50 }, { type: 'skin', id: 3, name: 'MOSS', price: 70 },
+  { type: 'skin', id: 4, name: 'FROST', price: 100 }, { type: 'skin', id: 5, name: 'DUSK', price: 120 },
+  { type: 'hat', id: 0, name: 'NO HAT', price: 0 }, { type: 'hat', id: 1, name: 'EMBER HAT', price: 20 },
+  { type: 'hat', id: 2, name: 'CROWN', price: 40 }, { type: 'hat', id: 3, name: 'FROST HAT', price: 60 }
+];
+const ACHIEVEMENTS = [
+  { id: 'first_world', name: 'A Place to Begin', desc: 'Save your first world.', coins: 15 },
+  { id: 'hunter_10', name: 'Husk Breaker', desc: 'Defeat 10 creatures.', coins: 20 },
+  { id: 'hunter_50', name: 'Seasoned Hunter', desc: 'Defeat 50 creatures.', coins: 40 },
+  { id: 'warden', name: 'First Ember', desc: 'Defeat the Ashen Warden.', coins: 30 },
+  { id: 'three_embers', name: 'All Three Embers', desc: 'Claim all three embers.', coins: 65 },
+  { id: 'maker', name: 'First Craft', desc: 'Make an item.', coins: 20 },
+  { id: 'explorer', name: 'Farther Afield', desc: 'Find eight places.', coins: 20 },
+  { id: 'friend', name: 'Friend Keeper', desc: 'Save a friend code.', coins: 15 }
+];
 const LS = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
@@ -79,9 +97,18 @@ async function accountCreate(name, password, confirm, skin, hat) {
 }
 function accountSwitch(id) {
   const p = ACCOUNT.profiles.find(v => v.id === id); if (!p) return false;
+  p.coins = max(0, p.coins | 0);
+  p.ownedSkins = Array.isArray(p.ownedSkins) ? p.ownedSkins.filter(n => Number.isInteger(n) && n >= 0 && n < SKINS.length) : [clamp(p.skin | 0, 0, SKINS.length - 1)];
+  p.ownedHats = Array.isArray(p.ownedHats) ? p.ownedHats.filter(n => Number.isInteger(n) && n >= 0 && n <= 3) : [clamp(p.hat | 0, 0, 3)];
+  p.ownedSkins = [...new Set([...p.ownedSkins, clamp(p.skin | 0, 0, SKINS.length - 1)])];
+  p.ownedHats = [...new Set([...p.ownedHats, clamp(p.hat | 0, 0, 3)])];
+  p.achievements = Array.isArray(p.achievements) ? p.achievements.filter(id => ACHIEVEMENTS.some(a => a.id === id)) : [];
+  p.worldKills = p.worldKills && typeof p.worldKills === 'object' ? p.worldKills : {};
+  p.lifetimeKills = max(0, p.lifetimeKills | 0);
   ACCOUNT.active = p; LS.del('ew2.active'); G.nick = p.name; G.skin = clamp(p.skin | 0, 0, 5); G.hat = clamp(p.hat | 0, 0, 3);
   if (FORM) { FORM.nick = p.name; FORM.skin = G.skin; FORM.hat = G.hat; }
   SAVE.list = readLocalIndex(); sortWorlds(); ACCOUNT.note = 'Logged in as ' + p.name + '.';
+  writeAccountProfiles();
   saveBoot();
   return true;
 }
@@ -110,6 +137,13 @@ async function accountLogin(p, password) {
     return false;
   } finally { ACCOUNT.busy = false; }
 }
+async function accountLoginByName(name, password) {
+  const username = cleanAccountName(name);
+  if (!username) { ACCOUNT.note = 'Enter your username.'; return false; }
+  const p = ACCOUNT.profiles.find(v => v.name.toLowerCase() === username.toLowerCase());
+  if (!p) { ACCOUNT.note = 'That username is not saved in this browser. Online accounts are not set up yet.'; return false; }
+  return accountLogin(p, password);
+}
 function accountLogout() {
   if (G.state === 'play' && WORLD.id && !WORLD.arena) saveWorld(true);
   if (COOP.role) coopLeave();
@@ -120,7 +154,110 @@ function accountLogout() {
 function accountSaveProfile() {
   if (!ACCOUNT.active) return;
   ACCOUNT.active.skin = G.skin; ACCOUNT.active.hat = G.hat; ACCOUNT.active.name = G.nick || ACCOUNT.active.name;
-  writeAccountProfiles();
+  return writeAccountProfiles();
+}
+function cosmeticOwned(type, id, profile = ACCOUNT.active) {
+  if (!profile) return false;
+  return ((type === 'skin' ? profile.ownedSkins : profile.ownedHats) || []).includes(id);
+}
+function cosmeticBuy(type, id) {
+  const item = COSMETICS.find(c => c.type === type && c.id === id), p = ACCOUNT.active;
+  if (!p || !item) { ACCOUNT.note = 'Sign in to use the customization shop.'; return false; }
+  if (cosmeticOwned(type, id, p)) { ACCOUNT.note = 'You already own that look.'; return false; }
+  if (p.coins < item.price) { ACCOUNT.note = 'You need ' + (item.price - p.coins) + ' more coins.'; return false; }
+  const owned = type === 'skin' ? p.ownedSkins : p.ownedHats, oldCoins = p.coins;
+  p.coins -= item.price; owned.push(id);
+  if (!writeAccountProfiles()) { p.coins = oldCoins; owned.pop(); ACCOUNT.note = 'Could not save your purchase in this browser.'; return false; }
+  ACCOUNT.note = 'Bought ' + item.name + '. Equip it from the customization hub.';
+  return true;
+}
+function cosmeticEquip(type, id) {
+  const p = ACCOUNT.active;
+  if (!p || !cosmeticOwned(type, id, p)) { ACCOUNT.note = 'You do not own that look yet.'; return false; }
+  const key = type === 'skin' ? 'skin' : type === 'hat' ? 'hat' : '';
+  if (!key) return false;
+  const previous = p[key], gamePrevious = G[key];
+  p[key] = id; G[key] = id; if (G.p) G.p[key] = id;
+  if (!accountSaveProfile()) { p[key] = previous; G[key] = gamePrevious; if (G.p) G.p[key] = gamePrevious; ACCOUNT.note = 'Could not save your equipped look in this browser.'; return false; }
+  ACCOUNT.note = 'Equipped ' + COSMETICS.find(c => c.type === type && c.id === id).name + '.';
+  return true;
+}
+function checkAchievements() {
+  const p = ACCOUNT.active;
+  if (!p) return [];
+  p.coins = max(0, p.coins | 0);
+  p.achievements = Array.isArray(p.achievements) ? p.achievements : [];
+  p.worldKills = p.worldKills && typeof p.worldKills === 'object' ? p.worldKills : {};
+  p.lifetimeKills = max(0, p.lifetimeKills | 0);
+  const world = WORLD && WORLD.id && !WORLD.guest && !WORLD.arena;
+  let progressChanged = false;
+  const previousLifetimeKills = p.lifetimeKills;
+  let previousWorldKills = 0;
+  if (world) {
+    const kills = max(0, G.kills | 0), prior = max(0, p.worldKills[WORLD.id] | 0);
+    previousWorldKills = prior;
+    if (kills > prior) { p.lifetimeKills += kills - prior; p.worldKills[WORLD.id] = kills; progressChanged = true; }
+  }
+  const checks = {
+    first_world: SAVE.list.length > 0,
+    hunter_10: p.lifetimeKills >= 10,
+    hunter_50: p.lifetimeKills >= 50,
+    warden: !!(world && G.flags && G.flags.wardenDead),
+    three_embers: !!(world && G.flags && G.flags.dbl && G.flags.e2 && G.flags.e3),
+    maker: !!(world && G.flags && G.flags.madeThing),
+    explorer: !!(world && G.found && G.found.size >= 8),
+    friend: friendList().length > 0
+  };
+  const earned = [];
+  for (const a of ACHIEVEMENTS) if (checks[a.id] && !p.achievements.includes(a.id)) {
+    p.achievements.push(a.id); p.coins += a.coins; earned.push(a);
+  }
+  if (earned.length || progressChanged) {
+    const total = earned.reduce((n, a) => n + a.coins, 0);
+    if (!writeAccountProfiles()) {
+      p.achievements = p.achievements.filter(id => !earned.some(a => a.id === id));
+      p.coins -= total;
+      p.lifetimeKills = previousLifetimeKills;
+      if (world) { if (previousWorldKills) p.worldKills[WORLD.id] = previousWorldKills; else delete p.worldKills[WORLD.id]; }
+      ACCOUNT.note = 'Could not save achievement progress in this browser.';
+      if (G.state === 'play') G.banner = { text: 'SAVE FAILED', sub: 'achievement progress could not be saved', t: 0 };
+      return [];
+    }
+    if (earned.length) {
+      ACCOUNT.note = 'Achievement unlocked: ' + earned.map(a => a.name).join(', ') + ' (+' + total + ' coins).';
+      if (G.state === 'play') G.banner = { text: 'ACHIEVEMENT', sub: earned[0].name + '  +' + total + ' COINS', t: 0 };
+    }
+  }
+  return earned;
+}
+function friendList() {
+  if (!ACCOUNT.active) return [];
+  try {
+    const saved = JSON.parse(LS.get(profileKey('friends')) || '[]');
+    return Array.isArray(saved) ? saved.filter(f => f && typeof f.name === 'string' && typeof f.code === 'string') : [];
+  } catch (e) { return []; }
+}
+function friendAdd(name, code) {
+  if (!ACCOUNT.active) { FRIENDS.note = 'Sign in to save friends to this profile.'; return false; }
+  name = cleanAccountName(name);
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!name) { FRIENDS.note = 'Enter your friend name.'; return false; }
+  if (code.length !== 6) { FRIENDS.note = 'A world code has six letters and numbers.'; return false; }
+  const friends = friendList(), i = friends.findIndex(f => f.code === code);
+  if (i >= 0) friends[i].name = name;
+  else friends.push({ name, code });
+  if (!LS.set(profileKey('friends'), JSON.stringify(friends))) { FRIENDS.note = 'Could not save this friend in this browser.'; return false; }
+  FRIENDS.note = i >= 0 ? 'Updated ' + name + '.' : 'Added ' + name + '.';
+  checkAchievements();
+  if (ACCOUNT.note.startsWith('Could not save achievement')) FRIENDS.note = ACCOUNT.note;
+  return true;
+}
+function friendRemove(code) {
+  if (!ACCOUNT.active) { FRIENDS.note = 'Sign in to manage saved friends.'; return false; }
+  const friends = friendList().filter(f => f.code !== code);
+  if (!LS.set(profileKey('friends'), JSON.stringify(friends))) { FRIENDS.note = 'Could not update saved friends in this browser.'; return false; }
+  FRIENDS.note = 'Friend removed.';
+  return true;
 }
 function readLocalIndex() {
   try {
@@ -150,7 +287,7 @@ function saveBoot() {
   } catch (e) { }
 }
 function sortWorlds() { SAVE.list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)); }
-function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, hat: G.hat, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
+function worldMeta() { return { id: WORLD.id, name: WORLD.name, seed: WORLD.seed, size: WORLD.size, shape: WORLD.shape, mode: WORLD.mode, skin: G.skin, hat: G.hat, e: embers(), v: 6, endless: 1, savedAt: Date.now(), played: round(G.played), kills: G.kills | 0, gcode: WORLD.gcode || '', gen: WORLD.gen || 1 }; }
 function snapshotWorld() {
   const p = G.p;
   return Object.assign(worldMeta(), {
@@ -166,6 +303,7 @@ function saveWorld(quiet) {
   const okLocal = LS.set(profileKey('w.' + WORLD.id), JSON.stringify(data));
   const i = SAVE.list.findIndex(m => m.id === WORLD.id); if (i < 0) SAVE.list.unshift(meta); else SAVE.list[i] = Object.assign(SAVE.list[i], meta);
   sortWorlds(); writeLocalIndex(); G.dirty = false; G.saveT = 0;
+  checkAchievements();
   if (SAVE.db) { SAVE.pending = { data, owner: accountId(), worlds: SAVE.list.map(m => Object.assign({}, m)) }; if (!SAVE.busy) pumpSaves(); }
   if (!quiet) G.savedNote = { t: 0, ok: okLocal || !!SAVE.db };
 }

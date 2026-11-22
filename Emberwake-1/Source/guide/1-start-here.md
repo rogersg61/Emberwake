@@ -39,4 +39,6 @@ To take a world from the app to a browser, or to another computer, choose **COPY
 
 When you open the game, sign in with your account password or create an account. The game signs you out when it closes, so you need your password the next time you play. Account profiles are stored in that browser or app; they are not online accounts. Existing guest worlds move to the first account you create.
 
+On the title screen, choose **CUSTOMIZATION + ACHIEVEMENTS** to earn coins from one-time milestones and spend them on skins and hats. Your coins, unlocked looks and worlds belong to the profile saved in that browser or app. A username and password can reopen that local profile, but cannot recover it on a different device or after browser data is erased. Use **COPY** and **PASTE A WORLD** to move a world to another device.
+
 > Everyone you play with needs this same version of the game. When you get a new version, send your friends the new Emberwake.html (or the app) too.

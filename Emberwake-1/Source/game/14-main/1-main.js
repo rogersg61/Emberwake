@@ -157,36 +157,38 @@ function renderView(al) {
   const vx0 = floor(cx / T) - 3, vx1 = floor((cx + VS.vw) / T) + 3, vy0 = floor(cy / T) - 3, vy1 = floor((cy + VS.vh) / T) + 3;
   const play = G.state === 'play' || G.state === 'intro', showP = play && !(p.dead && p.deadT > 60) && !p.onBarge;
   // ---------- lights ----------
-  dynLights.length = 0;
-  const lit = F.wardenDead || !!G.boss, b = G.boss, v = G.duel, mirrorOn = F.vesperDone || !!v;
-  for (const o of tileObjs.values()) {
-    if (o.x < vx0 - 20 || o.x > vx1 + 20) continue;
-    if (o.id === SHRINE) addLight(o.x * T + 4, o.y * T, lit ? 1 : .32, lit ? .62 : .14, lit ? .25 : .3);
-    else if (o.id === SHRINE2) addLight(o.x * T + 4, o.y * T - 4, mirrorOn ? .35 : .12, mirrorOn ? .75 : .25, mirrorOn ? .8 : .32);
-    else if (o.id === GATE) addLight(o.x * T + 4, o.y * T - 4, .6 + (F.vesperDone ? .25 : 0), .2, .08);
+  const b = G.boss, tx0 = floor(cx / T) - 10, ty0 = floor(cy / T) - 10, tw = ceil(VS.vw / T) + 21, th = ceil(VS.vh / T) + 21;
+  const kx0 = floor(cx / 256) - 1, kx1 = floor((cx + VS.vw) / 256) + 1, pods = [];
+  RFRAME++;
+  if (!SETTINGS.fpsMode) {
+    dynLights.length = 0;
+    const lit = F.wardenDead || !!G.boss, v = G.duel, mirrorOn = F.vesperDone || !!v;
+    for (const o of tileObjs.values()) {
+      if (o.x < vx0 - 20 || o.x > vx1 + 20) continue;
+      if (o.id === SHRINE) addLight(o.x * T + 4, o.y * T, lit ? 1 : .32, lit ? .62 : .14, lit ? .25 : .3);
+      else if (o.id === SHRINE2) addLight(o.x * T + 4, o.y * T - 4, mirrorOn ? .35 : .12, mirrorOn ? .75 : .25, mirrorOn ? .8 : .32);
+      else if (o.id === GATE) addLight(o.x * T + 4, o.y * T - 4, .6 + (F.vesperDone ? .25 : 0), .2, .08);
+    }
+    for (const fi of G.fires) if (fi.x1 > cx - 60 && fi.x0 < cx + VS.vw + 60) for (let X = fi.x0; X < fi.x1; X += 12) addLight(X, fi.y - 4, .8, .4, .12);
+    for (const e of G.enemies) if (e.type === 'cinderling' && !e.dead && e.x > cx - 60 && e.x < cx + VS.vw + 60) addLight(e.x + 4, e.y + 4, .7, .32, .1);
+    for (let k = kx0; k <= kx1; k++) { const bk = PROPB.get(k); if (bk) for (const q of bk) if (q.light && q.x > cx - 120 && q.x < cx + VS.vw + 120 && q.y > cy - 120 && q.y < cy + VS.vh + 120) { const fl = .93 + .07 * sin(G.time * .21 + q.x); addLight(q.x + (q.img.width >> 1), q.y + (q.lyo !== undefined ? q.lyo : q.img.height * .6), q.light[0] * fl, q.light[1] * fl, q.light[2] * fl); } }
+    if (!WORLD.arena) stationLights();
+    for (const o of tileObjs.values()) if (o.id === PEDESTAL && pedItem(o) && o.x > vx0 - 20 && o.x < vx1 + 20) addLight(o.x * T + 4, o.y * T - 6, .5, .45, .3);
+    for (const [tx, tr] of treeTops) {
+      if (tx < vx0 - 6 || tx > vx1 + 6) continue; const top = SPR.top[tr.kind][tr.v], sw = round(sin(G.time * .02 + tr.ph) * 1.3), X0 = tx * T + 4 - 23 + sw, Y0 = tr.y * T + 1 - 31;
+      for (const pd of top.pods) { const X = X0 + pd[0], Y = Y0 + pd[1], k = pd[2]; pods.push(X, Y, k); addLight(X, Y, k === 0 ? .62 : k === 1 ? .14 : .55, k === 0 ? .38 : k === 1 ? .46 : .16, k === 0 ? .14 : k === 1 ? .5 : .06); }
+    }
+    for (const pr of G.projs) { if (pr.type === 'wave') addLight(pr.x, pr.y, 1, .65, .3); else if (pr.type === 'bolt') addLight(pr.x, pr.y, .8, .35, .1); else if (pr.type === 'shock' || pr.type === 'bomb') addLight(pr.x, pr.y, .8, .45, .15); else if (pr.type === 'arrow') addLight(pr.x, pr.y, .45, .35, .12); }
+    for (const f of G.fighters) {
+      if (f.dead || f.x < cx - 60 || f.x > cx + VS.vw + 60) continue; const it = f === G.p && heldItem() || heldOf(f);
+      if (f === G.p) { if (!showP) continue; addLight(f.x + 3, f.y + 8, .66, .5, .32); if (it && it.id === 'torch') addLight(f.x + 3, f.y + 6, 1, .8, .46); }
+      if (it && it.glow) addLight(f.x + 3, f.y + 8, .75, .45, .18); else if (it && it.cold || f.skin === 4) addLight(f.x + 3, f.y + 8, .2, .5, .55);
+    }
+    for (const n of G.npcs) addLight(n.x + 3 + n.face * 3, n.y + 3, 1, .72, .36);
+    if (b && !b.boss) { if (b.type === 'keeper') { addLight(b.x + 6, b.y + 8, .95, .55, .25); addLight(b.x + 6 + b.dir * 14, b.y + 2, .7, .34, .12); } else addLight(b.x + 20, b.y + 10, .7 + b.core * .3, .36 + b.core * .3, .14); }
+    for (const t of G.trails) if (t.kind === 'hit' && t.big) addLight(t.x, t.y, .9, .7, .4);
+    dimLights(cx, cy); computeLight(tx0, ty0, tw, th, G.sun);
   }
-  RFRAME++; const kx0 = floor(cx / 256) - 1, kx1 = floor((cx + VS.vw) / 256) + 1;
-  for (const fi of G.fires) if (fi.x1 > cx - 60 && fi.x0 < cx + VS.vw + 60) for (let X = fi.x0; X < fi.x1; X += 12) addLight(X, fi.y - 4, .8, .4, .12);
-  for (const e of G.enemies) if (e.type === 'cinderling' && !e.dead && e.x > cx - 60 && e.x < cx + VS.vw + 60) addLight(e.x + 4, e.y + 4, .7, .32, .1);
-  for (let k = kx0; k <= kx1; k++) { const bk = PROPB.get(k); if (bk) for (const q of bk) if (q.light && q.x > cx - 120 && q.x < cx + VS.vw + 120 && q.y > cy - 120 && q.y < cy + VS.vh + 120) { const fl = .93 + .07 * sin(G.time * .21 + q.x); addLight(q.x + (q.img.width >> 1), q.y + (q.lyo !== undefined ? q.lyo : q.img.height * .6), q.light[0] * fl, q.light[1] * fl, q.light[2] * fl); } }
-  if (!WORLD.arena) stationLights();
-  for (const o of tileObjs.values()) if (o.id === PEDESTAL && pedItem(o) && o.x > vx0 - 20 && o.x < vx1 + 20) addLight(o.x * T + 4, o.y * T - 6, .5, .45, .3);
-  const pods = [];
-  for (const [tx, tr] of treeTops) {
-    if (tx < vx0 - 6 || tx > vx1 + 6) continue; const top = SPR.top[tr.kind][tr.v], sw = round(sin(G.time * .02 + tr.ph) * 1.3), X0 = tx * T + 4 - 23 + sw, Y0 = tr.y * T + 1 - 31;
-    for (const pd of top.pods) { const X = X0 + pd[0], Y = Y0 + pd[1], k = pd[2]; pods.push(X, Y, k); addLight(X, Y, k === 0 ? .62 : k === 1 ? .14 : .55, k === 0 ? .38 : k === 1 ? .46 : .16, k === 0 ? .14 : k === 1 ? .5 : .06); }
-  }
-  for (const pr of G.projs) { if (pr.type === 'wave') addLight(pr.x, pr.y, 1, .65, .3); else if (pr.type === 'bolt') addLight(pr.x, pr.y, .8, .35, .1); else if (pr.type === 'shock' || pr.type === 'bomb') addLight(pr.x, pr.y, .8, .45, .15); else if (pr.type === 'arrow') addLight(pr.x, pr.y, .45, .35, .12); }
-  for (const f of G.fighters) {
-    if (f.dead || f.x < cx - 60 || f.x > cx + VS.vw + 60) continue; const it = f === G.p && heldItem() || heldOf(f);
-    if (f === G.p) { if (!showP) continue; addLight(f.x + 3, f.y + 8, .66, .5, .32); if (it && it.id === 'torch') addLight(f.x + 3, f.y + 6, 1, .8, .46); }
-    if (it && it.glow) addLight(f.x + 3, f.y + 8, .75, .45, .18); else if (it && it.cold || f.skin === 4) addLight(f.x + 3, f.y + 8, .2, .5, .55);
-  }
-  for (const n of G.npcs) addLight(n.x + 3 + n.face * 3, n.y + 3, 1, .72, .36);
-  if (b && !b.boss) { if (b.type === 'keeper') { addLight(b.x + 6, b.y + 8, .95, .55, .25); addLight(b.x + 6 + b.dir * 14, b.y + 2, .7, .34, .12); } else addLight(b.x + 20, b.y + 10, .7 + b.core * .3, .36 + b.core * .3, .14); }
-  for (const t of G.trails) if (t.kind === 'hit' && t.big) addLight(t.x, t.y, .9, .7, .4);
-  const tx0 = floor(cx / T) - 10, ty0 = floor(cy / T) - 10, tw = ceil(VS.vw / T) + 21, th = ceil(VS.vh / T) + 21;
-  dimLights(cx, cy); computeLight(tx0, ty0, tw, th, G.sun);
   // ---------- static world at art resolution ----------
   const w = actx; w.setTransform(1, 0, 0, 1, 0, 0); w.clearRect(0, 0, acv.width, acv.height); w.setTransform(1, 0, 0, 1, -ax0, -ay0);
   const CP = CH * T, c0x = floor(cx / CP), c1x = floor((cx + VS.vw) / CP), c0y = floor(cy / CP), c1y = floor((cy + VS.vh) / CP);
@@ -221,10 +223,12 @@ function renderView(al) {
     else if (pr.type === 'cloud') { const r = pr.r * min(1, pr.t / 12) * min(1, (pr.life - pr.t) / 30 + .2); w.globalAlpha = .28; w.fillStyle = pr.col || '#6ff0c0'; w.beginPath(); w.arc(x, y, max(1, r), 0, TAU); w.fill(); w.globalAlpha = .45; w.beginPath(); w.arc(x + sin(G.time * .1 + pr.r) * 2, y, max(1, r * .55), 0, TAU); w.fill(); w.globalAlpha = 1; }
   }
   for (const q of G.stuck) w.drawImage(SPR.shuriken[0], round(q.x) - 2, round(q.y) - 2);
-  lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'copy'; lctx.imageSmoothingEnabled = true;
-  lctx.drawImage(lmc, 0, 0, tw, th, tx0 * T - ax0, ty0 * T - ay0, tw * T, th * T);
-  lctx.globalCompositeOperation = 'destination-in'; lctx.imageSmoothingEnabled = false; lctx.drawImage(acv, 0, 0);
-  w.setTransform(1, 0, 0, 1, 0, 0); w.globalCompositeOperation = 'multiply'; w.drawImage(lcv, 0, 0); w.globalCompositeOperation = 'source-over';
+  if (!SETTINGS.fpsMode) {
+    lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'copy'; lctx.imageSmoothingEnabled = true;
+    lctx.drawImage(lmc, 0, 0, tw, th, tx0 * T - ax0, ty0 * T - ay0, tw * T, th * T);
+    lctx.globalCompositeOperation = 'destination-in'; lctx.imageSmoothingEnabled = false; lctx.drawImage(acv, 0, 0);
+    w.setTransform(1, 0, 0, 1, 0, 0); w.globalCompositeOperation = 'multiply'; w.drawImage(lcv, 0, 0); w.globalCompositeOperation = 'source-over';
+  }
   ctx.drawImage(acv, offx, offy, acv.width * S, acv.height * S);
   // ---------- actors at full resolution, lit per sprite ----------
   ctx.setTransform(S, 0, 0, S, -ox, -oy);
@@ -239,6 +243,7 @@ function renderView(al) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawFG(cx, cy, ax0, ay0, offx, offy, tx0, ty0, tw, th, kx0, kx1);
   // ---------- emissive fx (low-res, additive) ----------
+  if (!SETTINGS.fpsMode) {
   const f = fctx, fx0 = floor(cx), fy0 = floor(cy); f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, fcv.width, fcv.height); f.setTransform(1, 0, 0, 1, -fx0, -fy0);
   const night = 1 - G.dn;
   for (let i = 0; i < pods.length; i += 3) { const X = pods[i], Y = pods[i + 1], k = pods[i + 2]; f.globalAlpha = .25 + .5 * night + .1 * sin(G.time * .05 + X); f.fillStyle = k === 1 ? '#4fd8c8' : k === 2 ? '#e2542b' : '#ffb347'; f.fillRect(X - 1, Y - 1, 3, 3); f.globalAlpha = 1; f.fillStyle = k === 1 ? '#c9fff6' : '#fff1a8'; f.fillRect(X, Y, 1, 1); }
@@ -288,6 +293,7 @@ function renderView(al) {
     else if (e.type === 'boss' && e.state !== 'tired') { const look = clamp(round((p.x - e.x - 20) / 40), -2, 2); f.fillStyle = e.phase === 2 ? '#fff1a8' : '#ff8a3d'; f.globalAlpha = .8; for (const q of [-12, 8]) f.fillRect(round(ex + 20 + q + look), round(ey + 16 - 5), 3, 3); f.fillStyle = '#ffd35a'; f.globalAlpha = .5 + e.core * .5; f.fillRect(round(ex + 18 - e.core * 2), round(ey - 1 - e.core * 2), 4 + e.core * 4, 5 + e.core * 4); f.globalAlpha = 1; }
   }
   ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(fcv, (fx0 - cx) * S, (fy0 - cy) * S, fcv.width * S, fcv.height * S); ctx.globalCompositeOperation = 'source-over';
+  }
   // ---------- unlit overlays in world space ----------
   ctx.setTransform(S, 0, 0, S, -ox, -oy);
   if (G.state === 'play') {
@@ -357,10 +363,12 @@ function drawFG(cx, cy, ax0, ay0, offx, offy, tx0, ty0, tw, th, kx0, kx1) {
   }
   for (let k = kx0; k <= kx1; k++) { const bk = FGPB.get(k); if (bk) for (const q of bk) if (q.rf !== RFRAME && q.x < cx + VS.vw && q.x + q.img.width > cx && q.y < cy + VS.vh && q.y + q.img.height > cy) { q.rf = RFRAME; g.drawImage(q.img, q.x, q.y); any = true; } }
   if (!any) return;
-  const l = glctx; l.setTransform(1, 0, 0, 1, 0, 0); l.globalCompositeOperation = 'copy'; l.imageSmoothingEnabled = true; l.drawImage(lmc, 0, 0, tw, th, tx0 * T - ax0, ty0 * T - ay0, tw * T, th * T); l.imageSmoothingEnabled = false; l.globalCompositeOperation = 'source-over';
-  for (const st of uni) { lightSample(st.lx * T + 4, st.ly * T + 4, LIT2); l.fillStyle = `rgb(${min(255, LIT2[0] * 250) | 0},${min(255, LIT2[1] * 250) | 0},${min(255, LIT2[2] * 250) | 0})`; l.fillRect(st.px - ax0, st.py - ay0, st.fac.cv.width, st.fac.cv.height); }
-  l.globalCompositeOperation = 'destination-in'; l.drawImage(gcv, 0, 0); l.globalCompositeOperation = 'source-over';
-  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.drawImage(glcv, 0, 0); g.globalCompositeOperation = 'source-over';
+  if (!SETTINGS.fpsMode) {
+    const l = glctx; l.setTransform(1, 0, 0, 1, 0, 0); l.globalCompositeOperation = 'copy'; l.imageSmoothingEnabled = true; l.drawImage(lmc, 0, 0, tw, th, tx0 * T - ax0, ty0 * T - ay0, tw * T, th * T); l.imageSmoothingEnabled = false; l.globalCompositeOperation = 'source-over';
+    for (const st of uni) { lightSample(st.lx * T + 4, st.ly * T + 4, LIT2); l.fillStyle = `rgb(${min(255, LIT2[0] * 250) | 0},${min(255, LIT2[1] * 250) | 0},${min(255, LIT2[2] * 250) | 0})`; l.fillRect(st.px - ax0, st.py - ay0, st.fac.cv.width, st.fac.cv.height); }
+    l.globalCompositeOperation = 'destination-in'; l.drawImage(gcv, 0, 0); l.globalCompositeOperation = 'source-over';
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'multiply'; g.drawImage(glcv, 0, 0); g.globalCompositeOperation = 'source-over';
+  }
   ctx.drawImage(gcv, offx, offy, gcv.width * S, gcv.height * S);
 }
 // facades fade when you are inside; see-through dressing thins out when you are behind it
@@ -428,6 +436,7 @@ function tick() {
   if (!WORLD.arena) { tickFalling(); tickFelled(); tickRubble(); tickDoors(); tickDrill(); tickStations(); if (!G.away) tickHunger(); if (!netGuest()) tickRegrow(); tickDims(); tickLairs(); tickBless(); tickFurniture(); tickMeal(); if (G.time % 20 === 0) { mapReveal(); G.magR = hasUtil('magnet') ? 76 : 36; } }
   if (WORLD.arena) arenaTick();
   if (G.combo.t > 0 && --G.combo.t <= 0) { G.combo.n = 0; G.combo.pts = 0; }
+  if (G.time % 60 === 0) checkAchievements();
   if (G.slowT > 0) G.slowT--; if (G.selT > 0) G.selT--;
   G.bars = approach(G.bars || 0, max(G.barT || 0, G.cine || G.link ? 1 : 0), .08); G.barT = 0;
   if (G.savedNote && ++G.savedNote.t > 120) G.savedNote = null;
@@ -511,8 +520,8 @@ addEventListener('keydown', e => {
     if (k === 'Backspace') { FORM[UI.focus] = FORM[UI.focus].slice(0, -1); e.preventDefault(); return; }
     if (k === 'Enter' || k === 'Tab' || k === 'Escape') { UI.focus = null; e.preventDefault(); return; }
     if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      const password = UI.focus === 'accountPassword' || UI.focus === 'accountConfirm', lim = password ? 64 : UI.focus === 'name' ? 24 : UI.focus === 'seed' ? 18 : UI.focus === 'gcode' ? 6 : 12;
-      if (FORM[UI.focus].length < lim && (password ? !/[\u0000-\u001f]/.test(e.key) : /[A-Za-z0-9 _\-'.]/.test(e.key))) FORM[UI.focus] += UI.focus === 'nick' ? e.key.toUpperCase() : UI.focus === 'code' ? e.key.toLowerCase() : e.key;
+      const password = UI.focus === 'accountPassword' || UI.focus === 'accountConfirm', lim = password ? 64 : UI.focus === 'name' ? 24 : UI.focus === 'seed' ? 18 : UI.focus === 'gcode' || UI.focus === 'friendCode' ? 6 : UI.focus === 'friendName' || UI.focus === 'accountName' ? 18 : 12;
+      if (FORM[UI.focus].length < lim && (password ? !/[\u0000-\u001f]/.test(e.key) : /[A-Za-z0-9 _\-'.]/.test(e.key))) FORM[UI.focus] += UI.focus === 'nick' || UI.focus === 'friendCode' ? e.key.toUpperCase() : UI.focus === 'code' ? e.key.toLowerCase() : e.key;
       e.preventDefault();
     }
     return;
@@ -551,7 +560,7 @@ addEventListener('mouseup', e => { if (e.button === 0) { mouse.l = false; mouse.
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   e.preventDefault(); const d = sign(e.deltaY);
-  if (G.state === 'worlds' || G.state === 'accounts') { UI.scroll = max(0, UI.scroll + d); return; }
+  if (G.state === 'worlds' || G.state === 'accounts' || G.state === 'friends' || G.state === 'customize') { UI.scroll = max(0, UI.scroll + d); return; }
   if (G.state !== 'play') return;
   if (UI.open === 'map') mapZoom(d);
   else if (UI.open) UI.scroll = max(0, UI.scroll + d * (UI.open === 'inv' ? 1 : 2));

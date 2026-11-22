@@ -4,7 +4,7 @@
 //  a hit box while it draws; clicks test last frame's boxes.
 // ============================================================
 const inR = (x, y, w, h) => mouse.ux >= x && mouse.ux < x + w && mouse.uy >= y && mouse.uy < y + h;
-const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', accountName: '', accountPassword: '', accountConfirm: '' };
+const FORM = { name: '', seed: '', size: 1, shape: 0, mode: 0, skin: 0, hat: 0, nick: '', code: '', friendName: '', friendCode: '', accountName: '', accountPassword: '', accountConfirm: '' };
 const SIZE_D = ['600 x 260 tiles', '900 x 320 tiles', '1400 x 380 tiles', '2200 x 440 tiles: days to cross'], SHAPE_D = ['every seed deals its lands in a new order', 'the Drift is crowded with islands', 'few islands, the Underdark yawns wider'], MODE_D = ['three embers, any order, nothing forced', 'every item, no monsters, build freely'];
 let HITS = [], HITS_NEXT = [];
 const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!slot });
@@ -37,17 +37,18 @@ function chooser(c, x, y, w, label, names, key, descs) {
 function skinPicker(c, x, y) {
   drawText(c, 'LOOK', x, y + 8, '#b9bdd0');
   for (let i = 0; i < SKINS.length; i++) {
-    const bx = x + 46 + i * 24, on = FORM.skin === i; c.fillStyle = on ? '#ffd35a' : inR(bx, y, 20, 22) ? '#8c86a8' : '#4a4460'; c.fillRect(bx, y, 20, 22); c.fillStyle = '#262234'; c.fillRect(bx + 1, y + 1, 18, 20);
+    const bx = x + 46 + i * 24, on = FORM.skin === i, owned = ACCOUNT.form === 'create' || !ACCOUNT.active || cosmeticOwned('skin', i); c.fillStyle = on ? '#ffd35a' : inR(bx, y, 20, 22) ? '#8c86a8' : '#4a4460'; c.fillRect(bx, y, 20, 22); c.fillStyle = '#262234'; c.fillRect(bx + 1, y + 1, 18, 20);
     c.drawImage(SK[i].head, bx + 3, y + 2, 14, 14); c.fillStyle = SKINS[i][4]; c.fillRect(bx + 3, y + 17, 7, 2); c.fillStyle = SKINS[i][0]; c.fillRect(bx + 10, y + 17, 7, 2);
-    hit(bx, y, 20, 22, () => { FORM.skin = i; sfx('ui'); });
+    if (!owned) { c.fillStyle = 'rgba(10,8,18,.75)'; c.fillRect(bx + 1, y + 1, 18, 20); textC(c, 'L', bx + 10, y + 7, '#ffd35a', 1, drawText); }
+    hit(bx, y, 20, 22, () => { if (!owned) { UI.customTab = 'shop'; G.state = 'customize'; return; } FORM.skin = i; sfx('ui'); });
   }
 }
 function hatPicker(c, x, y) {
   const names = ['NO HAT', 'EMBER', 'CROWN', 'FROST'];
   drawText(c, 'HAT', x, y + 8, '#b9bdd0');
   for (let i = 0; i < names.length; i++) {
-    const bx = x + 46 + i * 48, on = FORM.hat === i;
-    button(c, bx, y, 44, 16, names[i], () => { FORM.hat = i; sfx('ui'); }, { on });
+    const bx = x + 46 + i * 48, on = FORM.hat === i, owned = ACCOUNT.form === 'create' || !ACCOUNT.active || cosmeticOwned('hat', i);
+    button(c, bx, y, 44, 16, names[i], () => { if (!owned) { UI.customTab = 'shop'; G.state = 'customize'; return; } FORM.hat = i; sfx('ui'); }, { on, off: !owned });
   }
 }
 function slotBox(c, x, y, sel, hov) { c.fillStyle = sel ? '#ffd35a' : hov ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, 18, 18); c.fillStyle = sel ? '#3a3350' : '#262234'; c.fillRect(x + 1, y + 1, 16, 16); }
@@ -129,16 +130,93 @@ function drawLogo(c, cy, sub) {
 function drawTitle(c) {
   const uw = VS.uw, uh = VS.uh; c.fillStyle = 'rgba(18,13,31,.38)'; c.fillRect(0, 0, uw, uh);
   drawLogo(c, round(uh * .16), 'THREE EMBERS : GO ANYWHERE');
-  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .47);
-  button(c, bx, by, bw, 18, 'WORLDS', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
-  button(c, bx, by + 23, bw, 18, 'JOIN A FRIEND', () => { G.state = 'join'; UI.focus = null; COOP.err = ''; COOP.note = ''; COOP.long = false; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
-  button(c, bx, by + 46, bw, 18, 'THE CINDER RING : ONLINE PVP', () => { G.state = 'ring'; UI.focus = null; if (!FORM.nick) FORM.nick = 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
-  button(c, bx, by + 69, bw, 18, 'THE ASHFALL : BATTLE ROYALE', () => { G.state = 'brform'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); if (FORM.brcode === undefined) FORM.brcode = ''; sfx('ui'); });
-  button(c, bx, by + 92, bw, 18, 'ACCOUNT: ' + (ACCOUNT.active ? ACCOUNT.active.name.toUpperCase().slice(0, 16) : 'GUEST'), () => { G.state = 'accounts'; ACCOUNT.note = ''; UI.focus = null; sfx('ui'); });
-  button(c, bx, by + 115, bw, 18, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
+  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .28), gap = 16, bh = 15;
+  button(c, bx, by, bw, bh, 'WORLDS', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
+  button(c, bx, by + gap, bw, bh, 'JOIN A FRIEND', () => { G.state = 'join'; UI.focus = null; COOP.err = ''; COOP.note = ''; COOP.long = false; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
+  button(c, bx, by + gap * 2, bw, bh, 'THE CINDER RING : ONLINE PVP', () => { G.state = 'ring'; UI.focus = null; if (!FORM.nick) FORM.nick = 'WAKER' + ((Math.random() * 90 + 10) | 0); sfx('ui'); });
+  button(c, bx, by + gap * 3, bw, bh, 'THE ASHFALL : BATTLE ROYALE', () => { G.state = 'brform'; UI.focus = null; if (!FORM.nick) FORM.nick = cleanName(G.nick) || 'WAKER' + ((Math.random() * 90 + 10) | 0); if (FORM.brcode === undefined) FORM.brcode = ''; sfx('ui'); });
+  button(c, bx, by + gap * 4, bw, bh, 'ACCOUNT: ' + (ACCOUNT.active ? ACCOUNT.active.name.toUpperCase().slice(0, 16) : 'GUEST'), () => { G.state = 'accounts'; ACCOUNT.note = ''; UI.focus = null; sfx('ui'); });
+  button(c, bx, by + gap * 5, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
+  button(c, bx, by + gap * 6, bw, bh, 'CUSTOMIZATION + ACHIEVEMENTS', () => { G.state = 'customize'; UI.customTab = 'shop'; UI.scroll = 0; ACCOUNT.note = ''; sfx('ui'); });
+  button(c, bx, by + gap * 7, bw, bh, muted ? 'SOUND: OFF' : 'SOUND: ON', () => { muted = !muted; sfx('ui'); });
   textC(c, 'build, explore, and fight with every form', uw / 2, uh - 26, '#d8d4e6', 1, textO);
   textC(c, 'mouse + keyboard', uw / 2, uh - 15, '#8b8fa3', 1, textO);
   const vs = 'version ' + GAME_VERSION; textS(c, vs, uw - textW(vs) - 4, uh - 10, '#6a6485');
+}
+function drawCustomization(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(248, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'CUSTOMIZATION + ACHIEVEMENTS');
+  if (!ACCOUNT.active) {
+    textC(c, 'Sign in to save coins and cosmetics to a profile.', uw / 2, y + 38, '#ffb347', 1, drawText);
+    button(c, x + w - 66, y + h - 20, 60, 14, 'BACK', () => { G.state = 'title'; });
+    return;
+  }
+  const coins = ACCOUNT.active.coins | 0;
+  drawText(c, 'COINS: ' + coins, x + w - 74, y + 3, '#ffd35a');
+  button(c, x + 8, y + 16, 86, 15, 'SHOP', () => { UI.customTab = 'shop'; UI.scroll = 0; }, { on: UI.customTab !== 'achievements' });
+  button(c, x + 98, y + 16, 112, 15, 'ACHIEVEMENTS', () => { UI.customTab = 'achievements'; UI.scroll = 0; }, { on: UI.customTab === 'achievements' });
+  const start = y + 36, rowH = UI.customTab === 'achievements' ? 23 : 19, visible = max(1, floor((h - 84) / rowH));
+  const list = UI.customTab === 'achievements' ? ACHIEVEMENTS : COSMETICS;
+  UI.scroll = clamp(UI.scroll, 0, max(0, list.length - visible));
+  for (let i = 0; i < visible; i++) {
+    const item = list[i + UI.scroll]; if (!item) break;
+    const ry = start + i * rowH; c.fillStyle = i % 2 ? '#221e30' : '#292438'; c.fillRect(x + 6, ry, w - 12, rowH - 1);
+    if (UI.customTab === 'achievements') {
+      const done = ACCOUNT.active.achievements.includes(item.id);
+      drawText(c, (done ? '✓ ' : '○ ') + item.name, x + 10, ry + 2, done ? '#7ddc6f' : '#fff');
+      drawText(c, item.desc + '  +' + item.coins, x + 10, ry + 12, '#8b8fa3');
+    } else {
+      const owned = cosmeticOwned(item.type, item.id), equipped = ACCOUNT.active[item.type] === item.id;
+      const label = item.type === 'skin' ? 'SKIN ' + (item.id + 1) : 'HAT';
+      drawText(c, label + ': ' + item.name, x + 10, ry + 6, equipped ? '#ffd35a' : '#fff');
+      if (owned) button(c, x + w - 68, ry + 2, 58, 14, equipped ? 'EQUIPPED' : 'EQUIP', () => cosmeticEquip(item.type, item.id), { off: equipped });
+      else button(c, x + w - 68, ry + 2, 58, 14, 'BUY ' + item.price, () => cosmeticBuy(item.type, item.id), { off: coins < item.price });
+    }
+  }
+  if (list.length > visible) drawText(c, `${UI.scroll + 1}-${min(list.length, UI.scroll + visible)} of ${list.length}  (wheel)`, x + 8, y + h - 27, '#6a6485');
+  if (ACCOUNT.note) drawText(c, ACCOUNT.note, x + 8, y + h - 37, ACCOUNT.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
+  drawText(c, 'Earn coins by completing one-time achievements.', x + 8, y + h - 17, '#8b8fa3');
+  button(c, x + w - 66, y + h - 18, 60, 14, 'BACK', () => { G.state = 'title'; UI.focus = null; sfx('ui'); });
+}
+function joinFriendWorld(f) {
+  if (!ACCOUNT.active) { FRIENDS.note = 'Sign in to join a saved friend.'; return; }
+  if (!f || !/^[A-Z0-9]{6}$/.test(f.code)) { FRIENDS.note = 'That saved world code is invalid.'; return; }
+  FORM.nick = cleanName(ACCOUNT.active.name) || 'WAKER'; FORM.skin = ACCOUNT.active.skin | 0; FORM.hat = ACCOUNT.active.hat | 0; FORM.gcode = f.code;
+  COOP.long = false; COOP.err = ''; COOP.note = ''; G.state = 'join'; sigJoin(f.code);
+}
+function drawFriends(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(236, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
+  c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FRIENDS');
+  const fx = x + 8;
+  drawText(c, 'Save a friend’s name and six-letter world code.', fx, y + 16, '#d8d4e6');
+  drawText(c, 'Ask them for the code shown in Esc → PLAY TOGETHER.', fx, y + 26, '#8b8fa3');
+  drawText(c, 'NAME', fx, y + 46, '#b9bdd0'); field(c, fx + 34, y + 42, 94, 'friendName', 'friend name');
+  drawText(c, 'CODE', fx + 133, y + 46, '#b9bdd0'); field(c, fx + 165, y + 42, 60, 'friendCode', 'ABC123');
+  button(c, fx + 231, y + 42, 48, 14, 'ADD', () => {
+    if (friendAdd(FORM.friendName, FORM.friendCode)) FORM.friendName = FORM.friendCode = '';
+  });
+  const friends = friendList(), rowH = 22, start = y + 62, visible = max(1, floor((h - 96) / rowH));
+  UI.scroll = clamp(UI.scroll, 0, max(0, friends.length - visible));
+  if (!ACCOUNT.active) textC(c, 'Sign in to save friends to an account on this device.', uw / 2, start + 10, '#ffb347', 1, drawText);
+  else if (!friends.length) textC(c, 'No saved friends yet.', uw / 2, start + 12, '#8b8fa3', 1, drawText);
+  for (let i = 0; i < visible; i++) {
+    const f = friends[i + UI.scroll]; if (!f) break;
+    const ry = start + i * rowH;
+    c.fillStyle = inR(x + 5, ry, w - 10, rowH - 2) ? '#2b2740' : '#221e30'; c.fillRect(x + 5, ry, w - 10, rowH - 2);
+    drawText(c, f.name.slice(0, 18), x + 10, ry + 5, '#fff');
+    drawText(c, f.code, x + 112, ry + 5, '#ffd35a');
+    if (UI.confirm === 'friend:' + f.code) {
+      button(c, x + w - 100, ry + 3, 42, 14, 'REMOVE?', () => { if (friendRemove(f.code)) UI.confirm = null; });
+      button(c, x + w - 53, ry + 3, 45, 14, 'CANCEL', () => { UI.confirm = null; });
+    } else {
+      button(c, x + w - 100, ry + 3, 42, 14, 'JOIN', () => joinFriendWorld(f));
+      button(c, x + w - 53, ry + 3, 45, 14, 'REMOVE', () => { UI.confirm = 'friend:' + f.code; });
+    }
+  }
+  if (FRIENDS.note) drawText(c, FRIENDS.note, x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
+  else if (friends.length > visible) drawText(c, `${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, x + 7, y + h - 30, '#6a6485');
+  if (ACCOUNT.active) drawText(c, 'Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', x + 7, y + h - 20, '#8b8fa3');
+  button(c, x + w - 66, y + h - 18, 60, 14, 'BACK', () => { G.state = 'title'; UI.focus = null; UI.confirm = null; sfx('ui'); });
 }
 function drawWorlds(c) {
   const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), x = round((uw - w) / 2), y = 16, h = uh - 32;
@@ -203,7 +281,7 @@ function drawAccounts(c) {
     button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
   } else {
     textC(c, 'SIGN IN TO CONTINUE', uw / 2, y + 17, '#b9bdd0', 1, drawText);
-    textC(c, 'Choose an account, or create one. Profiles stay in this browser.', uw / 2, y + 28, '#8b8fa3', 1, drawText);
+    textC(c, 'Username and password work for profiles saved in this browser.', uw / 2, y + 28, '#8b8fa3', 1, drawText);
     const rowH = 22, start = y + 34, visible = max(1, floor((h - 120) / rowH));
     UI.scroll = clamp(UI.scroll, 0, max(0, ACCOUNT.profiles.length - visible));
     for (let i = 0; i < visible; i++) {
@@ -215,7 +293,7 @@ function drawAccounts(c) {
       drawText(c, p.name, x + 30, ry + 6, active ? '#ffd35a' : '#fff');
       button(c, x + w - 82, ry + 3, 74, 14, active ? 'ACTIVE' : ACCOUNT.loginId === p.id ? 'SELECTED' : 'SELECT', () => {
         if (active) { G.state = 'title'; return; }
-        ACCOUNT.loginId = p.id; FORM.accountPassword = ''; FORM.accountConfirm = ''; UI.focus = 'accountPassword'; ACCOUNT.note = '';
+        ACCOUNT.loginId = p.id; FORM.accountName = p.name; FORM.accountPassword = ''; FORM.accountConfirm = ''; UI.focus = 'accountPassword'; ACCOUNT.note = '';
         sfx('ui');
       }, { off: active });
     }
@@ -229,11 +307,12 @@ function drawAccounts(c) {
         accountSetPassword(selected, FORM.accountPassword, FORM.accountConfirm).then(ok => { if (ok) FORM.accountPassword = FORM.accountConfirm = ''; });
         sfx('ui');
       }, { off: ACCOUNT.busy });
-    } else if (selected) {
-      panel(c, x + 8, y + h - 80, w - 16, 52, 'PASSWORD');
+    } else {
+      panel(c, x + 8, y + h - 104, w - 16, 76, 'USERNAME + PASSWORD');
+      field(c, x + 16, y + h - 82, 150, 'accountName', 'username');
       field(c, x + 16, y + h - 58, 150, 'accountPassword', 'your password');
       button(c, x + w - 94, y + h - 58, 82, 14, ACCOUNT.busy ? 'CHECKING...' : 'LOG IN', () => {
-        accountLogin(selected, FORM.accountPassword).then(ok => { if (ok) FORM.accountPassword = ''; });
+        accountLoginByName(FORM.accountName, FORM.accountPassword).then(ok => { if (ok) FORM.accountPassword = ''; });
         sfx('ui');
       }, { off: ACCOUNT.busy });
     }
@@ -467,7 +546,7 @@ function drawDialog(c) {
 }
 function drawUI(c) {
   HITS_NEXT = []; const uw = VS.uw, uh = VS.uh, st = G.state;
-  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
+  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'friends') drawFriends(c); else if (st === 'customize') drawCustomization(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
   else if (st === 'loading') { c.fillStyle = 'rgba(18,13,31,.82)'; c.fillRect(0, 0, uw, uh); textC(c, G.loadMsg || 'Loading...', uw / 2, round(uh * .45), '#fff1a8', 1, textO); const n = (performance.now() / 300 | 0) % 4; textC(c, '.'.repeat(n), uw / 2, round(uh * .45) + 12, '#ffd35a', 1, textO); }
   else if (st === 'intro') {
     c.fillStyle = 'rgba(18,13,31,.84)'; c.fillRect(0, 0, uw, uh);

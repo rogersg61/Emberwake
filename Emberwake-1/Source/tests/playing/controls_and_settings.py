@@ -125,8 +125,20 @@ async def main():
     ambientCounts = [await h.ev("G.parts.length")]
     await h.ev("render(1); mouse.ux = %d; mouse.uy = %d; uiMouseDown(0); G.parts.length = 0; ambient();" % (x + 130 + 59, y + hh - 36 + 6))
     ambientCounts.append(await h.ev("G.parts.length"))
+    lightCalls = await h.ev("""(() => {
+        const original = computeLight, calls = [];
+        try {
+            let n = 0; computeLight = (...args) => { n++; return original(...args); };
+            SETTINGS.fpsMode = true; render(1); calls.push(n);
+            SETTINGS.fpsMode = false; render(1); calls.push(n);
+        } finally { computeLight = original; SETTINGS.fpsMode = true; }
+        return calls;
+    })()""")
     await h.ev("render(1); mouse.ux = %d; mouse.uy = %d; uiMouseDown(0);" % (x + 130 + 59, y + hh - 36 + 6))
     res['I fps mode'] = [fps, ambientCounts, await h.ev("localStorage.getItem('ew_settings')")]
+    res['I fps lighting calls'] = lightCalls
+    assert lightCalls == [0, 1], 'FPS mode should skip dynamic lighting while normal mode keeps it.'
+    assert ambientCounts == [0, 1], 'Ambient particles should toggle with FPS mode.'
     res['I pause cycle'] = cyc
     res['I stored'] = await h.ev("localStorage.getItem('ew_settings')")
     await h.ev("UI.open = 'journal'; UI.jtab = 'leads'; render(1);")

@@ -43,6 +43,6 @@ Blocks, food and other usable things still do their job when you click empty spa
 - **Controls: SIMPLE** (the default). Only where you aim (up, straight, down) and holding **S** choose your attack, so you never lunge or dash across the screen by surprise. **FULL** brings back the extra forms tied to the movement keys and how far away the cursor is (the forms page, **C**, greys them out in SIMPLE).
 - **Difficulty: EASY** (the default): you take 30% less damage, heal twice as fast and get hungry more slowly. **NORMAL** is the original balance. **HARD**: 25% more damage taken, slower healing, faster hunger.
 - **Crafting: SIMPLE** (the default). At a station you click what you want and it is made after a short bar fills (shift-click makes five). Fires and kilns work whenever they have fuel, and light themselves from your sticks or logs; food never burns. **HANDS-ON** brings back the station games (sawing, the potter's wheel, the bellows, the anvil...), heat and the kiln's damper, and food that chars if you forget it.
-- **FPS MODE: OFF** (the default). Turn it on to stop ambient effects and particle effects for smoother play on slower computers. It changes only decoration; world simulation, gameplay and multiplayer stay the same.
+- **FPS MODE: OFF** (the default). Turn it on to stop ambient and particle effects and simplify lighting for smoother play on slower computers. It changes only decoration; world simulation, gameplay and multiplayer stay the same.
 
 All four are remembered on this computer.

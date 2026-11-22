@@ -623,6 +623,7 @@ function computeLight(x0, y0, w, h, sun) {
   lmx.putImageData(limg, 0, 0);
 }
 function lightSample(wx, wy, out) {
+  if (SETTINGS.fpsMode) { out[0] = out[1] = out[2] = 1; return; }
   const fx = wx / T - .5 - LX0, fy = wy / T - .5 - LY0, x = floor(fx), y = floor(fy);
   if (!lr || x < 0 || y < 0 || x >= LW - 1 || y >= LH - 1) { out[0] = out[1] = out[2] = 1; return; }
   const u = fx - x, v = fy - y, i = y * LW + x, a = (1 - u) * (1 - v), b = u * (1 - v), c = (1 - u) * v, d = u * v;

@@ -224,7 +224,8 @@ function guestEnter(m) {
   }, 40);
 }
 // what you carry between visits to a friend's world
-function guestKey() { return 'ew2.guest.' + WORLD.id; }
+function guestLegacyKey() { return 'ew2.guest.' + WORLD.id; }
+function guestKey() { return ACCOUNT.active ? profileKey('guest.' + WORLD.id) : guestLegacyKey(); }
 function guestSave() {
   if (!netGuest() || !G.p || !WORLD.id) return;
   const o = { v: 1, inv: inv.slice(0, INV_N).map(s => s ? [s.id, s.n] : 0), worn: [...(G.worn || [])], gear: GEAR_SLOTS.map(s => G.gear && G.gear[s] ? G.gear[s].id : ''), off: G.gear && G.gear.off ? G.gear.off.id : '',
@@ -232,7 +233,15 @@ function guestSave() {
   LS.set(guestKey(), JSON.stringify(o));
 }
 function guestLoad() {
-  let o = null; try { o = JSON.parse(LS.get(guestKey()) || 'null'); } catch (e) { }
+  const key = guestKey(), legacy = guestLegacyKey(); let raw = LS.get(key);
+  if (raw === null && key !== legacy) {
+    const old = LS.get(legacy);
+    if (old !== null) {
+      if (LS.set(key, old)) { LS.del(legacy); raw = old; }
+      else COOP.err = 'Could not move your old guest pack to this account in this browser.';
+    }
+  }
+  let o = null; try { o = JSON.parse(raw || 'null'); } catch (e) { }
   G.worn = new Set(); G.gear = { head: null, body: null, legs: null, feet: null }; GEAR_C = null; G.mast = {}; fightLoad(o && o.fight, o && o.known); trinkLoad(null); G.pairsKnown = new Set(); INV_N = packCap(); inv = new Array(PACK_MAX).fill(null);
   if (!o) {
     // a friend's first visit starts like the host's did: with nothing (a forge world hands everyone its kit)

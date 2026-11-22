@@ -18,7 +18,9 @@ On the title screen choose **JOIN A FRIEND**, type your name and the game code, 
 
 ![JOIN A FRIEND, with a code typed in](pictures/join.jpg)
 
-The first time a friend visits your world they start with **nothing**, just like you did: an empty pack, no armour, no trinkets. What they gather, make and wear is kept on their computer for the next time they visit that world. The join screen remembers the last code you typed.
+The first time a friend visits your world they start with **nothing**, just like you did: an empty pack, no armour, no trinkets. What they gather, make and wear is kept with their signed-in profile in that browser for the next visit to that world. The join screen remembers the last code you typed.
+
+On the title screen, choose **FRIENDS** to save a friend's name and world code to the signed-in profile in this browser. Use **JOIN** beside their entry to join with that profile's name and look; you can chat with **Enter** once you are together. Ask your friend for the six-letter code shown in **Esc → PLAY TOGETHER**. These are local saved contacts, not online accounts or friend requests, and they do not sync to another device.
 
 ## In the world together
 

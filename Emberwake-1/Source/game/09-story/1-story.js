@@ -221,6 +221,7 @@ function onKill(type) {
 }
 function onCraft(id) {
   const it = IT[id]; if (!it) return;
+  G.flags.madeThing = true;
   const first = (k, msg) => { if (!G.flags['said_' + k]) { G.flags['said_' + k] = true; say(msg); } };
   if (id === 'twine') first('twine', 'Twine. Now you can bind things.');
   if (['knifeblade', 'axehead', 'pickhead', 'shovelhead', 'spearhead'].includes(id)) first('head', 'A clean head. Bind it to a stick with twine [E].');
