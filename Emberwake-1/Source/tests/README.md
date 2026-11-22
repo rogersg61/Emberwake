@@ -65,7 +65,7 @@ Cinderdeep, the Rootdark and the Glass Expanse.
 
 Links, armour, weapon styles, creatures and guardians.
 
-- `cinder_ring.py` The Cinder Ring online over the message-board relay: players meet by ring code, share movement and land PvP damage.
+- `cinder_ring.py` The Cinder Ring relay: players meet by code, select a shared broker, survive brief stalls, share movement and land PvP damage.
 - `armour.py` Armour: walking, jumping and damage taken with each set.
 - `bosses.py` Each guardian: summoned, every attack, the second phase, and its reward.
 - `creatures.py` Every creature of every world moves, fights, dies and drops things.

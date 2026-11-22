@@ -10013,12 +10013,20 @@ function netLeave() {
 function netSignalMessage(m) {
   if (NET.transport !== 'signal' || !m || typeof m.g !== 'string' || m.g === NET.me || m.ring !== NET.code) return;
   if (m.t === 'ringLeave') NET.signalPeers.delete(m.g);
-  else if (m.t === 'ring' && m.p && typeof m.p === 'object' && m.p.ring === NET.code) NET.signalPeers.set(m.g, { presence: m.p, at: performance.now() });
+  else if (m.t === 'ring' && m.p && typeof m.p === 'object' && m.p.ring === NET.code) NET.signalPeers.set(m.g, { presence: m.p, mask: num(m.b) | 0, at: performance.now() });
+}
+function netSignalPublishMask() {
+  const available = sigMask(); let selected = 0;
+  for (const q of NET.signalPeers.values()) {
+    const common = available & q.mask;
+    if (common) selected |= common & -common;
+  }
+  return selected || available;
 }
 function netSignalRefresh(now) {
   const peers = [];
   for (const [id, q] of NET.signalPeers) {
-    if (now - q.at > 4000) NET.signalPeers.delete(id);
+    if (now - q.at > 10000) NET.signalPeers.delete(id);
     else peers.push({ peer: id, presence: q.presence, kind: 'viewer', guest: false });
   }
   netPeers(peers);
@@ -11904,7 +11912,8 @@ function sigSend(obj) {
   if (!SIG.code) return; obj.b = sigMask(); obj.z = rlyZ() ? 1 : 0; const s = sigSeal(obj); SIG.seen.add(s.slice(0, 22));
   // the newest of each kind of note is enough (an offer, an answer to a friend, the host's hello)
   const k = obj.t + ':' + (obj.g || ''); SIG.out = SIG.out.filter(o => o.k !== k); SIG.out.push({ k, s }); if (SIG.out.length > 8) SIG.out.shift();
-  for (const C of SIG.conns) C.pub(s); sigRoomPush();
+  const mask = SIG.role === 'ring' ? netSignalPublishMask() : sigMask();
+  for (const C of SIG.conns) if (mask & (1 << C.i)) C.pub(s); sigRoomPush();
 }
 function sigIn(s) {
   if (typeof s !== 'string' || !SIG.code) return; const k = s.slice(0, 22); if (SIG.seen.has(k)) return; SIG.seen.add(k);

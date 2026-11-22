@@ -137,7 +137,8 @@ function sigSend(obj) {
   if (!SIG.code) return; obj.b = sigMask(); obj.z = rlyZ() ? 1 : 0; const s = sigSeal(obj); SIG.seen.add(s.slice(0, 22));
   // the newest of each kind of note is enough (an offer, an answer to a friend, the host's hello)
   const k = obj.t + ':' + (obj.g || ''); SIG.out = SIG.out.filter(o => o.k !== k); SIG.out.push({ k, s }); if (SIG.out.length > 8) SIG.out.shift();
-  for (const C of SIG.conns) C.pub(s); sigRoomPush();
+  const mask = SIG.role === 'ring' ? netSignalPublishMask() : sigMask();
+  for (const C of SIG.conns) if (mask & (1 << C.i)) C.pub(s); sigRoomPush();
 }
 function sigIn(s) {
   if (typeof s !== 'string' || !SIG.code) return; const k = s.slice(0, 22); if (SIG.seen.has(k)) return; SIG.seen.add(k);

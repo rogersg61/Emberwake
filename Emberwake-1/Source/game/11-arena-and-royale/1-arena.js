@@ -56,12 +56,20 @@ function netLeave() {
 function netSignalMessage(m) {
   if (NET.transport !== 'signal' || !m || typeof m.g !== 'string' || m.g === NET.me || m.ring !== NET.code) return;
   if (m.t === 'ringLeave') NET.signalPeers.delete(m.g);
-  else if (m.t === 'ring' && m.p && typeof m.p === 'object' && m.p.ring === NET.code) NET.signalPeers.set(m.g, { presence: m.p, at: performance.now() });
+  else if (m.t === 'ring' && m.p && typeof m.p === 'object' && m.p.ring === NET.code) NET.signalPeers.set(m.g, { presence: m.p, mask: num(m.b) | 0, at: performance.now() });
+}
+function netSignalPublishMask() {
+  const available = sigMask(); let selected = 0;
+  for (const q of NET.signalPeers.values()) {
+    const common = available & q.mask;
+    if (common) selected |= common & -common;
+  }
+  return selected || available;
 }
 function netSignalRefresh(now) {
   const peers = [];
   for (const [id, q] of NET.signalPeers) {
-    if (now - q.at > 4000) NET.signalPeers.delete(id);
+    if (now - q.at > 10000) NET.signalPeers.delete(id);
     else peers.push({ peer: id, presence: q.presence, kind: 'viewer', guest: false });
   }
   netPeers(peers);
