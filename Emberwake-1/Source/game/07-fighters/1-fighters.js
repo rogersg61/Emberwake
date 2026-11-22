@@ -411,6 +411,7 @@ const outImg = outX.createImageData(RB, RB), ghostPool = [];
 let wctx = null; const LIT = [1, 1, 1];
 function pixelize(n, o) {
   const src = rigX.getImageData(0, 0, n, n).data, dst = outImg.data, W4 = RB * 4, n4 = n * 4, fl = o && o.flash, tn = o && o.tint;
+  outX.clearRect(0, 0, n, n);
   const L = LIT, l0 = L[0], l1 = L[1], l2 = L[2];
   for (let y = 0; y < n; y++) {
     let si = y * n4, di = y * W4;
@@ -427,11 +428,15 @@ function pixelize(n, o) {
   outX.putImageData(outImg, 0, 0, 0, 0, n, n);
 }
 function drawEnt(n, ox, oy, fn, wx, wy, o) {
-  rigX.setTransform(1, 0, 0, 1, 0, 0); rigX.clearRect(0, 0, n, n); rigX.translate(ox, oy); fn(rigX); rigX.setTransform(1, 0, 0, 1, 0, 0);
+  rigX.save(); rigX.setTransform(1, 0, 0, 1, 0, 0); rigX.clearRect(0, 0, RB, RB); rigX.translate(ox, oy); fn(rigX); rigX.restore();
   lightSample(wx, wy + (o && o.ly !== undefined ? o.ly : 0), LIT); if (o && o.unlit) LIT[0] = LIT[1] = LIT[2] = 1; pixelize(n, o);
   const S = VS.s, dx = round((wx - ox) * S) / S, dy = round((wy - oy) * S) / S;
-  if (o && o.alpha !== undefined) wctx.globalAlpha = o.alpha;
-  wctx.drawImage(outCv, 0, 0, n, n, dx, dy, n, n); wctx.globalAlpha = 1;
+  wctx.save();
+  wctx.imageSmoothingEnabled = false;
+  wctx.globalCompositeOperation = 'source-over';
+  wctx.globalAlpha = o && o.alpha !== undefined ? clamp(o.alpha, 0, 1) : 1;
+  wctx.drawImage(outCv, 0, 0, n, n, dx, dy, n, n);
+  wctx.restore();
   return [dx, dy];
 }
 function makeGhost(dx, dy, n, col) {

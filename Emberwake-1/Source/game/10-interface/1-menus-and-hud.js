@@ -11,7 +11,7 @@ const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!s
 function panel(c, x, y, w, h, title) {
   c.fillStyle = INK; c.fillRect(x - 1, y - 1, w + 2, h + 2); c.fillStyle = '#1d1a29'; c.fillRect(x, y, w, h);
   c.fillStyle = '#4a4460'; c.fillRect(x, y, w, 1); c.fillRect(x, y, 1, h); c.fillStyle = '#2b2740'; c.fillRect(x, y + h - 1, w, 1); c.fillRect(x + w - 1, y, 1, h);
-  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, title, x + 5, y + 3, '#ffd35a'); }
+  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, fitText(title, w - 10), x + 5, y + 3, '#ffd35a'); }
 }
 function button(c, x, y, w, h, label, fn, o = {}) {
   const hv = !o.off && inR(x, y, w, h), on = o.on;
@@ -23,8 +23,9 @@ function button(c, x, y, w, h, label, fn, o = {}) {
 function field(c, x, y, w, key, ph) {
   const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
-  if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
-  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
+  const display = v ? fitText(v, w - 8) : fitText(ph, w - 8);
+  drawText(c, display, x + 4, y + 4, v ? '#fff' : '#6a6485');
+  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(min(x + w - 5, x + 5 + textW(display)), y + 3, 1, 8); }
   hit(x, y, w, 14, () => { UI.focus = key; sfx('ui'); });
 }
 function chooser(c, x, y, w, label, names, key, descs) {
@@ -188,14 +189,22 @@ function drawFriends(c) {
   const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(236, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FRIENDS');
   const fx = x + 8;
-  drawText(c, 'Save a friend’s name and six-letter world code.', fx, y + 16, '#d8d4e6');
-  drawText(c, 'Ask them for the code shown in Esc → PLAY TOGETHER.', fx, y + 26, '#8b8fa3');
-  drawText(c, 'NAME', fx, y + 46, '#b9bdd0'); field(c, fx + 34, y + 42, 94, 'friendName', 'friend name');
-  drawText(c, 'CODE', fx + 133, y + 46, '#b9bdd0'); field(c, fx + 165, y + 42, 60, 'friendCode', 'ABC123');
-  button(c, fx + 231, y + 42, 48, 14, 'ADD', () => {
+  const promptW = w - 16;
+  const prompt1 = wrapText("Save a friend's name and six-letter world code.", promptW);
+  const prompt2 = wrapText('Ask them for the code shown in Esc → PLAY TOGETHER.', promptW);
+  let promptY = y + 16;
+  prompt1.forEach(l => { drawText(c, l, fx, promptY, '#d8d4e6'); promptY += 9; });
+  prompt2.forEach(l => { drawText(c, l, fx, promptY, '#8b8fa3'); promptY += 9; });
+  const inputY = y + max(42, promptY + 7);
+  const nameW = max(54, min(94, w - 266));
+  drawText(c, 'NAME', fx, inputY + 4, '#b9bdd0'); field(c, fx + 34, inputY, nameW, 'friendName', 'friend name');
+  const codeX = fx + 34 + nameW + 5;
+  drawText(c, 'CODE', codeX, inputY + 4, '#b9bdd0'); field(c, codeX + 32, inputY, 60, 'friendCode', 'ABC123');
+  const addX = codeX + 32 + 60 + 6;
+  button(c, addX, inputY, 48, 14, 'ADD', () => {
     if (friendAdd(FORM.friendName, FORM.friendCode)) FORM.friendName = FORM.friendCode = '';
   });
-  const friends = friendList(), rowH = 22, start = y + 62, visible = max(1, floor((h - 96) / rowH));
+  const friends = friendList(), rowH = 22, start = inputY + 20, visible = max(1, floor((y + h - 30 - start) / rowH));
   UI.scroll = clamp(UI.scroll, 0, max(0, friends.length - visible));
   if (!ACCOUNT.active) textC(c, 'Sign in to save friends to an account on this device.', uw / 2, start + 10, '#ffb347', 1, drawText);
   else if (!friends.length) textC(c, 'No saved friends yet.', uw / 2, start + 12, '#8b8fa3', 1, drawText);
@@ -213,9 +222,9 @@ function drawFriends(c) {
       button(c, x + w - 53, ry + 3, 45, 14, 'REMOVE', () => { UI.confirm = 'friend:' + f.code; });
     }
   }
-  if (FRIENDS.note) drawText(c, FRIENDS.note, x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
-  else if (friends.length > visible) drawText(c, `${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, x + 7, y + h - 30, '#6a6485');
-  if (ACCOUNT.active) drawText(c, 'Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', x + 7, y + h - 20, '#8b8fa3');
+  if (FRIENDS.note) drawText(c, fitText(FRIENDS.note, w - 14), x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
+  else if (friends.length > visible) drawText(c, fitText(`${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, w - 14), x + 7, y + h - 30, '#6a6485');
+  if (ACCOUNT.active) drawText(c, fitText('Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', w - 14), x + 7, y + h - 20, '#8b8fa3');
   button(c, x + w - 66, y + h - 18, 60, 14, 'BACK', () => { G.state = 'title'; UI.focus = null; UI.confirm = null; sfx('ui'); });
 }
 function drawWorlds(c) {

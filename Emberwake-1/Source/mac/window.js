@@ -35,6 +35,7 @@ function openWindow(game, icon) {
   try { $.NSProcessInfo.processInfo.setProcessName('Emberwake'); } catch (e) { }
   app.setActivationPolicy(0); // a normal app: Dock icon and menu bar
   if (icon) { var img = $.NSImage.alloc.initWithContentsOfFile(icon); if (img && !img.isNil()) app.setApplicationIconImage(img); }
+  try { app.setAutomaticCustomizeTouchBarMenuItemEnabled(false); } catch (e) { }
 
   // menu bar: Emberwake (hide, quit) and Window (full screen, minimise, close)
   var CMD = 1 << 20, CTRL = 1 << 18;
@@ -76,6 +77,8 @@ function openWindow(game, icon) {
   var w = Math.min(1280, Math.floor(vf.size.width * 0.9)), h = Math.min(800, Math.floor(vf.size.height * 0.9));
   var win = $.NSWindow.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(0, 0, w, h), 1 | 2 | 4 | 8, 2, false);
   win.setTitle('Emberwake'); win.setMinSize($.NSMakeSize(720, 450)); win.setCollectionBehavior(1 << 7); win.setReleasedWhenClosed(false);
+  win.setRestorable(true);
+  try { win.setTitlebarAppearsTransparent(false); } catch (e) { }
   win.setBackgroundColor($.NSColor.colorWithSRGBRedGreenBlueAlpha(14 / 255, 11 / 255, 20 / 255, 1));
   win.center;
 

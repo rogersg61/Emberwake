@@ -252,7 +252,8 @@ function fontAtlas(col) {
   return a;
 }
 function drawText(c, s, x, y, col = '#fff', sc = 1) {
-  const a = fontAtlas(col); let cx = x; s = String(s);
+  const a = fontAtlas(col); let cx = x;
+  s = String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/—/g, '-').replace(/…/g, '...');
   for (let i = 0; i < s.length; i++) {
     const ch = s[i]; if (ch === ' ') { cx += 3 * sc; continue; }
     const g = Font.g[ch] || Font.g['?'];
@@ -260,7 +261,14 @@ function drawText(c, s, x, y, col = '#fff', sc = 1) {
   }
   return cx - x;
 }
-function textW(s, sc = 1) { let w = 0; s = String(s); for (let i = 0; i < s.length; i++) { const ch = s[i]; w += ch === ' ' ? 3 : ((Font.g[ch] || Font.g['?']).w + 1); } return (w - 1) * sc; }
+function textW(s, sc = 1) { let w = 0; s = String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/—/g, '-').replace(/…/g, '...'); for (let i = 0; i < s.length; i++) { const ch = s[i]; w += ch === ' ' ? 3 : ((Font.g[ch] || Font.g['?']).w + 1); } return (w - 1) * sc; }
+function fitText(s, w, sc = 1) {
+  s = String(s);
+  if (textW(s, sc) <= w) return s;
+  let out = s;
+  while (out.length > 1 && textW(out + '...', sc) > w) out = out.slice(0, -1);
+  return out + '...';
+}
 const TC = new Map();
 function textSprite(s, col, sc, mode, oc) {
   const k = mode + col + sc + oc + '|' + s; let e = TC.get(k);
@@ -275,10 +283,28 @@ function textS(c, s, x, y, col = '#fff', sc = 1, sh = '#0e0b14') { s = String(s)
 function textO(c, s, x, y, col = '#fff', sc = 1, oc = '#0e0b14') { s = String(s); if (!s) return 0; c.drawImage(textSprite(s, col, sc, 2, oc), x - sc, y - sc); return textW(s, sc); }
 function textC(c, s, cx, y, col, sc = 1, fn = textS) { return fn(c, s, round(cx - textW(s, sc) / 2), y, col, sc); }
 function wrapText(s, w, sc = 1) {
-  const out = []; for (const para of String(s).split('\n')) {
-    let line = ''; for (const word of para.split(' ')) { const t = line ? line + ' ' + word : word; if (textW(t, sc) > w && line) { out.push(line); line = word; } else line = t; }
+  const out = [];
+  for (const para of String(s).split('\n')) {
+    let line = '';
+    for (let word of para.split(' ')) {
+      if (!word) { continue; }
+      if (textW(word, sc) > w) {
+        if (line) { out.push(line); line = ''; }
+        while (textW(word, sc) > w) {
+          let split = 1;
+          while (split < word.length && textW(word.slice(0, split + 1), sc) <= w) split++;
+          out.push(word.slice(0, split));
+          word = word.slice(split);
+        }
+        if (word) line = word;
+        continue;
+      }
+      const t = line ? line + ' ' + word : word;
+      if (textW(t, sc) > w && line) { out.push(line); line = word; } else line = t;
+    }
     out.push(line);
-  } return out;
+  }
+  return out;
 }
 
 // ============================================================
@@ -7252,6 +7278,7 @@ const outImg = outX.createImageData(RB, RB), ghostPool = [];
 let wctx = null; const LIT = [1, 1, 1];
 function pixelize(n, o) {
   const src = rigX.getImageData(0, 0, n, n).data, dst = outImg.data, W4 = RB * 4, n4 = n * 4, fl = o && o.flash, tn = o && o.tint;
+  outX.clearRect(0, 0, n, n);
   const L = LIT, l0 = L[0], l1 = L[1], l2 = L[2];
   for (let y = 0; y < n; y++) {
     let si = y * n4, di = y * W4;
@@ -7268,11 +7295,15 @@ function pixelize(n, o) {
   outX.putImageData(outImg, 0, 0, 0, 0, n, n);
 }
 function drawEnt(n, ox, oy, fn, wx, wy, o) {
-  rigX.setTransform(1, 0, 0, 1, 0, 0); rigX.clearRect(0, 0, n, n); rigX.translate(ox, oy); fn(rigX); rigX.setTransform(1, 0, 0, 1, 0, 0);
+  rigX.save(); rigX.setTransform(1, 0, 0, 1, 0, 0); rigX.clearRect(0, 0, RB, RB); rigX.translate(ox, oy); fn(rigX); rigX.restore();
   lightSample(wx, wy + (o && o.ly !== undefined ? o.ly : 0), LIT); if (o && o.unlit) LIT[0] = LIT[1] = LIT[2] = 1; pixelize(n, o);
   const S = VS.s, dx = round((wx - ox) * S) / S, dy = round((wy - oy) * S) / S;
-  if (o && o.alpha !== undefined) wctx.globalAlpha = o.alpha;
-  wctx.drawImage(outCv, 0, 0, n, n, dx, dy, n, n); wctx.globalAlpha = 1;
+  wctx.save();
+  wctx.imageSmoothingEnabled = false;
+  wctx.globalCompositeOperation = 'source-over';
+  wctx.globalAlpha = o && o.alpha !== undefined ? clamp(o.alpha, 0, 1) : 1;
+  wctx.drawImage(outCv, 0, 0, n, n, dx, dy, n, n);
+  wctx.restore();
   return [dx, dy];
 }
 function makeGhost(dx, dy, n, col) {
@@ -7287,7 +7318,7 @@ function makeGhost(dx, dy, n, col) {
 //  Warden, and Vesper, the Glass Waker (a duelist on the fighter rig)
 // ============================================================
 function mkEnemy(type, x, y) {
-  const e = { type, x, y, px: x, py: y, vx: 0, vy: 0, onGround: false, flash: 0, stun: 0, state: 'idle', t: 0, dir: 1, dead: false, launched: 0, kbRes: 0, seed: Math.random() * 100, contact: true, sq: 0, wait: 30, ph: 0 };
+  const e = { type, x, y, px: x, py: y, vx: 0, vy: 0, onGround: false, flash: 0, spawnT: 18, stun: 0, state: 'idle', t: 0, dir: 1, dead: false, launched: 0, kbRes: 0, seed: Math.random() * 100, contact: true, sq: 0, wait: 30, ph: 0 };
   if (type === 'mote') Object.assign(e, { w: 10, h: 8, hp: 20, dmg: 8, name: 'Ash Mote' });
   else if (type === 'husk') Object.assign(e, { w: 6, h: 19, hp: 48, dmg: 14, kbRes: .25, canStep: true, contact: false, name: 'Husk' });
   else if (type === 'mite') Object.assign(e, { w: 9, h: 6, hp: 24, dmg: 9, canStep: true, name: 'Glass Mite' });
@@ -7394,7 +7425,7 @@ function tickEnemies() {
 function tickEnemy(e, i, arr, p) {
   {
     if (e.dead) { arr.splice(i, 1); return; }
-    e.px = e.x; e.py = e.y; if (e.flash > 0) e.flash--;
+    e.px = e.x; e.py = e.y; if (e.flash > 0) e.flash--; if (e.spawnT > 0) e.spawnT--;
     if (e.st && tickStatus(e)) return;
     if (e.root) return; if (e.type === 'boss') { tickBoss(e); return; } if (e.type === 'keeper') { tickKeeper(e); return; }
     if (e.type === 'dummy') { e.vy = min(e.vy + .3, 5); e.vx *= .6; moveBody(e); if (e.homeX === undefined) { e.homeX = e.x; e.homeY = e.y; } if (!e.tempPost && hypot(e.x - e.homeX, e.y - e.homeY) > 20 && e.flash <= 0 && (e.idle = (e.idle || 0) + 1) > 120) { dust(e.x + 4, e.y + e.h, 6); e.x = e.px = e.homeX; e.y = e.py = e.homeY; e.vx = e.vy = 0; e.idle = 0; dust(e.x + 4, e.y + e.h, 6); } else if (e.flash > 0) e.idle = 0; return; }
@@ -7700,6 +7731,7 @@ function huskPose(e, al) {
 }
 function drawEnemy(e, al) {
   const x = lerp(e.px, e.x, al), y = lerp(e.py, e.y, al), o = { flash: e.flash > 3 };
+  if (e.spawnT > 0) o.alpha = clamp((18 - e.spawnT) / 18, 0, 1);
   if (MOBX[e.type]) { MOBX[e.type].draw(e, x, y, o); return; }
   if (e.type === 'mote') { const s = e.sq + sin(G.time * .12 + e.seed) * .06; drawEnt(32, 16, 26, c => { c.scale(1 + s * .32, 1 - s * .32); c.drawImage(SPR.mote, -6, -9); }, x + e.w / 2, y + e.h, { flash: o.flash, ly: -5 }); }
   else if (e.type === 'mite') { const fr = SPR.mite[(e.ph | 0) % 2], tele = e.state === 'tele'; drawEnt(32, 16, 24, c => { c.scale(e.dir, 1); if (e.state === 'leap') c.rotate(-.3); c.drawImage(fr, -5, -7 + (tele && (e.t >> 1) & 1 ? -1 : 0)); }, x + e.w / 2, y + e.h, { flash: o.flash || (tele && (e.t >> 2) & 1), ly: -4 }); }
@@ -9008,7 +9040,7 @@ const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!s
 function panel(c, x, y, w, h, title) {
   c.fillStyle = INK; c.fillRect(x - 1, y - 1, w + 2, h + 2); c.fillStyle = '#1d1a29'; c.fillRect(x, y, w, h);
   c.fillStyle = '#4a4460'; c.fillRect(x, y, w, 1); c.fillRect(x, y, 1, h); c.fillStyle = '#2b2740'; c.fillRect(x, y + h - 1, w, 1); c.fillRect(x + w - 1, y, 1, h);
-  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, title, x + 5, y + 3, '#ffd35a'); }
+  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, fitText(title, w - 10), x + 5, y + 3, '#ffd35a'); }
 }
 function button(c, x, y, w, h, label, fn, o = {}) {
   const hv = !o.off && inR(x, y, w, h), on = o.on;
@@ -9020,8 +9052,9 @@ function button(c, x, y, w, h, label, fn, o = {}) {
 function field(c, x, y, w, key, ph) {
   const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
-  if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
-  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
+  const display = v ? fitText(v, w - 8) : fitText(ph, w - 8);
+  drawText(c, display, x + 4, y + 4, v ? '#fff' : '#6a6485');
+  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(min(x + w - 5, x + 5 + textW(display)), y + 3, 1, 8); }
   hit(x, y, w, 14, () => { UI.focus = key; sfx('ui'); });
 }
 function chooser(c, x, y, w, label, names, key, descs) {
@@ -9185,14 +9218,22 @@ function drawFriends(c) {
   const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(236, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FRIENDS');
   const fx = x + 8;
-  drawText(c, 'Save a friend’s name and six-letter world code.', fx, y + 16, '#d8d4e6');
-  drawText(c, 'Ask them for the code shown in Esc → PLAY TOGETHER.', fx, y + 26, '#8b8fa3');
-  drawText(c, 'NAME', fx, y + 46, '#b9bdd0'); field(c, fx + 34, y + 42, 94, 'friendName', 'friend name');
-  drawText(c, 'CODE', fx + 133, y + 46, '#b9bdd0'); field(c, fx + 165, y + 42, 60, 'friendCode', 'ABC123');
-  button(c, fx + 231, y + 42, 48, 14, 'ADD', () => {
+  const promptW = w - 16;
+  const prompt1 = wrapText("Save a friend's name and six-letter world code.", promptW);
+  const prompt2 = wrapText('Ask them for the code shown in Esc → PLAY TOGETHER.', promptW);
+  let promptY = y + 16;
+  prompt1.forEach(l => { drawText(c, l, fx, promptY, '#d8d4e6'); promptY += 9; });
+  prompt2.forEach(l => { drawText(c, l, fx, promptY, '#8b8fa3'); promptY += 9; });
+  const inputY = y + max(42, promptY + 7);
+  const nameW = max(54, min(94, w - 266));
+  drawText(c, 'NAME', fx, inputY + 4, '#b9bdd0'); field(c, fx + 34, inputY, nameW, 'friendName', 'friend name');
+  const codeX = fx + 34 + nameW + 5;
+  drawText(c, 'CODE', codeX, inputY + 4, '#b9bdd0'); field(c, codeX + 32, inputY, 60, 'friendCode', 'ABC123');
+  const addX = codeX + 32 + 60 + 6;
+  button(c, addX, inputY, 48, 14, 'ADD', () => {
     if (friendAdd(FORM.friendName, FORM.friendCode)) FORM.friendName = FORM.friendCode = '';
   });
-  const friends = friendList(), rowH = 22, start = y + 62, visible = max(1, floor((h - 96) / rowH));
+  const friends = friendList(), rowH = 22, start = inputY + 20, visible = max(1, floor((y + h - 30 - start) / rowH));
   UI.scroll = clamp(UI.scroll, 0, max(0, friends.length - visible));
   if (!ACCOUNT.active) textC(c, 'Sign in to save friends to an account on this device.', uw / 2, start + 10, '#ffb347', 1, drawText);
   else if (!friends.length) textC(c, 'No saved friends yet.', uw / 2, start + 12, '#8b8fa3', 1, drawText);
@@ -9210,9 +9251,9 @@ function drawFriends(c) {
       button(c, x + w - 53, ry + 3, 45, 14, 'REMOVE', () => { UI.confirm = 'friend:' + f.code; });
     }
   }
-  if (FRIENDS.note) drawText(c, FRIENDS.note, x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
-  else if (friends.length > visible) drawText(c, `${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, x + 7, y + h - 30, '#6a6485');
-  if (ACCOUNT.active) drawText(c, 'Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', x + 7, y + h - 20, '#8b8fa3');
+  if (FRIENDS.note) drawText(c, fitText(FRIENDS.note, w - 14), x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
+  else if (friends.length > visible) drawText(c, fitText(`${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, w - 14), x + 7, y + h - 30, '#6a6485');
+  if (ACCOUNT.active) drawText(c, fitText('Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', w - 14), x + 7, y + h - 20, '#8b8fa3');
   button(c, x + w - 66, y + h - 18, 60, 14, 'BACK', () => { G.state = 'title'; UI.focus = null; UI.confirm = null; sfx('ui'); });
 }
 function drawWorlds(c) {
@@ -11804,7 +11845,12 @@ function sendFoes(P) {
 function onFoes(m) {
   for (const q of Array.isArray(m.e) ? m.e : []) {
     const id = q[0], d = q[1]; if (!d || typeof d !== 'object') continue; let g = COOP.ghosts.get(id);
-    if (!g) { if (!q[2] || typeof d.type !== 'string') continue; g = { ghost: true, nid: id, x: num(d.x), y: num(d.y), px: num(d.x), py: num(d.y), vx: 0, vy: 0, w: 8, h: 8, hp: 1, maxhp: 1, flash: 0, t: 0, dead: false }; COOP.ghosts.set(id, g); G.enemies.push(g); }
+    if (!g) {
+      if (!q[2] || typeof d.type !== 'string') continue;
+      const base = mkEnemy(d.type, num(d.x), num(d.y));
+      g = Object.assign(base, { ghost: true, nid: id, px: num(d.x), py: num(d.y), hp: num(d.hp, base.hp), maxhp: num(d.mhp, base.maxhp), flash: 0, spawnT: 18, dead: false });
+      COOP.ghosts.set(id, g); G.enemies.push(g);
+    }
     for (const k in d) {
       let v = d[k];
       if (k === 'x' || k === 'y') continue;
@@ -11826,7 +11872,7 @@ function onFoes(m) {
 // guests: creatures glide toward where the host says they are
 function ghostTick() {
   for (const g of COOP.ghosts.values()) {
-    g.px = g.x; g.py = g.y; if (g.flash > 0) g.flash--; g.heardT = (g.heardT || 0) + 1;
+    g.px = g.x; g.py = g.y; if (g.flash > 0) g.flash--; if (g.spawnT > 0) g.spawnT--; g.heardT = (g.heardT || 0) + 1;
     if (g._ref) for (const k in g._ref) { const r = COOP.ghosts.get(g._ref[k]); if (r) { g[k] = r; delete g._ref[k]; } }
     if (g.ax === undefined) continue; if (g.heardT <= (COOP.slow ? 12 : 6)) { g.ax += num(g.vx); if (g.fly) g.ay += num(g.vy); }
     if (abs(g.ax - g.x) > 80 || abs(g.ay - g.y) > 80) { g.x = g.px = g.ax; g.y = g.py = g.ay; } else { g.x += (g.ax - g.x) * .35; g.y += (g.ay - g.y) * .35; }
@@ -12076,7 +12122,7 @@ function drawJoinLong(c) {
   drawText(c, 'Best on the same Wi-Fi; most home internet works too.', fx, y + h - 24, '#8b8fa3');
   button(c, x + w - 70, y + h - 16, 60, 13, 'BACK', () => { COOP.long = false; coopLeave(); COOP.err = ''; sfx('ui'); });
 }
-function wrapDraw(c, s, x, y, w, col) { const words = String(s).split(' '); let line = '', yy = y; for (const wd of words) { const t = line ? line + ' ' + wd : wd; if (textW(t) > w && line) { drawText(c, line, x, yy, col); yy += 10; line = wd; } else line = t; } if (line) drawText(c, line, x, yy, col); }
+function wrapDraw(c, s, x, y, w, col) { let yy = y; for (const line of wrapText(s, w)) { if (line) drawText(c, line, x, yy, col); yy += 10; } }
 
 // ---------------- moving a world between computers (or from the Mac app to a browser) as text ----------------
 async function worldCopy(m) {

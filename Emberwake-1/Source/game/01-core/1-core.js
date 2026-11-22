@@ -237,7 +237,8 @@ function fontAtlas(col) {
   return a;
 }
 function drawText(c, s, x, y, col = '#fff', sc = 1) {
-  const a = fontAtlas(col); let cx = x; s = String(s);
+  const a = fontAtlas(col); let cx = x;
+  s = String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/—/g, '-').replace(/…/g, '...');
   for (let i = 0; i < s.length; i++) {
     const ch = s[i]; if (ch === ' ') { cx += 3 * sc; continue; }
     const g = Font.g[ch] || Font.g['?'];
@@ -245,7 +246,14 @@ function drawText(c, s, x, y, col = '#fff', sc = 1) {
   }
   return cx - x;
 }
-function textW(s, sc = 1) { let w = 0; s = String(s); for (let i = 0; i < s.length; i++) { const ch = s[i]; w += ch === ' ' ? 3 : ((Font.g[ch] || Font.g['?']).w + 1); } return (w - 1) * sc; }
+function textW(s, sc = 1) { let w = 0; s = String(s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/—/g, '-').replace(/…/g, '...'); for (let i = 0; i < s.length; i++) { const ch = s[i]; w += ch === ' ' ? 3 : ((Font.g[ch] || Font.g['?']).w + 1); } return (w - 1) * sc; }
+function fitText(s, w, sc = 1) {
+  s = String(s);
+  if (textW(s, sc) <= w) return s;
+  let out = s;
+  while (out.length > 1 && textW(out + '...', sc) > w) out = out.slice(0, -1);
+  return out + '...';
+}
 const TC = new Map();
 function textSprite(s, col, sc, mode, oc) {
   const k = mode + col + sc + oc + '|' + s; let e = TC.get(k);
@@ -260,8 +268,26 @@ function textS(c, s, x, y, col = '#fff', sc = 1, sh = '#0e0b14') { s = String(s)
 function textO(c, s, x, y, col = '#fff', sc = 1, oc = '#0e0b14') { s = String(s); if (!s) return 0; c.drawImage(textSprite(s, col, sc, 2, oc), x - sc, y - sc); return textW(s, sc); }
 function textC(c, s, cx, y, col, sc = 1, fn = textS) { return fn(c, s, round(cx - textW(s, sc) / 2), y, col, sc); }
 function wrapText(s, w, sc = 1) {
-  const out = []; for (const para of String(s).split('\n')) {
-    let line = ''; for (const word of para.split(' ')) { const t = line ? line + ' ' + word : word; if (textW(t, sc) > w && line) { out.push(line); line = word; } else line = t; }
+  const out = [];
+  for (const para of String(s).split('\n')) {
+    let line = '';
+    for (let word of para.split(' ')) {
+      if (!word) { continue; }
+      if (textW(word, sc) > w) {
+        if (line) { out.push(line); line = ''; }
+        while (textW(word, sc) > w) {
+          let split = 1;
+          while (split < word.length && textW(word.slice(0, split + 1), sc) <= w) split++;
+          out.push(word.slice(0, split));
+          word = word.slice(split);
+        }
+        if (word) line = word;
+        continue;
+      }
+      const t = line ? line + ' ' + word : word;
+      if (textW(t, sc) > w && line) { out.push(line); line = word; } else line = t;
+    }
     out.push(line);
-  } return out;
+  }
+  return out;
 }

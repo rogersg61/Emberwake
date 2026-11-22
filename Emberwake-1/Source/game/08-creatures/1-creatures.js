@@ -3,7 +3,7 @@
 //  Warden, and Vesper, the Glass Waker (a duelist on the fighter rig)
 // ============================================================
 function mkEnemy(type, x, y) {
-  const e = { type, x, y, px: x, py: y, vx: 0, vy: 0, onGround: false, flash: 0, stun: 0, state: 'idle', t: 0, dir: 1, dead: false, launched: 0, kbRes: 0, seed: Math.random() * 100, contact: true, sq: 0, wait: 30, ph: 0 };
+  const e = { type, x, y, px: x, py: y, vx: 0, vy: 0, onGround: false, flash: 0, spawnT: 18, stun: 0, state: 'idle', t: 0, dir: 1, dead: false, launched: 0, kbRes: 0, seed: Math.random() * 100, contact: true, sq: 0, wait: 30, ph: 0 };
   if (type === 'mote') Object.assign(e, { w: 10, h: 8, hp: 20, dmg: 8, name: 'Ash Mote' });
   else if (type === 'husk') Object.assign(e, { w: 6, h: 19, hp: 48, dmg: 14, kbRes: .25, canStep: true, contact: false, name: 'Husk' });
   else if (type === 'mite') Object.assign(e, { w: 9, h: 6, hp: 24, dmg: 9, canStep: true, name: 'Glass Mite' });
@@ -110,7 +110,7 @@ function tickEnemies() {
 function tickEnemy(e, i, arr, p) {
   {
     if (e.dead) { arr.splice(i, 1); return; }
-    e.px = e.x; e.py = e.y; if (e.flash > 0) e.flash--;
+    e.px = e.x; e.py = e.y; if (e.flash > 0) e.flash--; if (e.spawnT > 0) e.spawnT--;
     if (e.st && tickStatus(e)) return;
     if (e.root) return; if (e.type === 'boss') { tickBoss(e); return; } if (e.type === 'keeper') { tickKeeper(e); return; }
     if (e.type === 'dummy') { e.vy = min(e.vy + .3, 5); e.vx *= .6; moveBody(e); if (e.homeX === undefined) { e.homeX = e.x; e.homeY = e.y; } if (!e.tempPost && hypot(e.x - e.homeX, e.y - e.homeY) > 20 && e.flash <= 0 && (e.idle = (e.idle || 0) + 1) > 120) { dust(e.x + 4, e.y + e.h, 6); e.x = e.px = e.homeX; e.y = e.py = e.homeY; e.vx = e.vy = 0; e.idle = 0; dust(e.x + 4, e.y + e.h, 6); } else if (e.flash > 0) e.idle = 0; return; }
@@ -416,6 +416,7 @@ function huskPose(e, al) {
 }
 function drawEnemy(e, al) {
   const x = lerp(e.px, e.x, al), y = lerp(e.py, e.y, al), o = { flash: e.flash > 3 };
+  if (e.spawnT > 0) o.alpha = clamp((18 - e.spawnT) / 18, 0, 1);
   if (MOBX[e.type]) { MOBX[e.type].draw(e, x, y, o); return; }
   if (e.type === 'mote') { const s = e.sq + sin(G.time * .12 + e.seed) * .06; drawEnt(32, 16, 26, c => { c.scale(1 + s * .32, 1 - s * .32); c.drawImage(SPR.mote, -6, -9); }, x + e.w / 2, y + e.h, { flash: o.flash, ly: -5 }); }
   else if (e.type === 'mite') { const fr = SPR.mite[(e.ph | 0) % 2], tele = e.state === 'tele'; drawEnt(32, 16, 24, c => { c.scale(e.dir, 1); if (e.state === 'leap') c.rotate(-.3); c.drawImage(fr, -5, -7 + (tele && (e.t >> 1) & 1 ? -1 : 0)); }, x + e.w / 2, y + e.h, { flash: o.flash || (tele && (e.t >> 2) & 1), ly: -4 }); }
