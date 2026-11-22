@@ -1,4 +1,4 @@
-# Simple controls (fists, chains), difficulty, digging by hand, knapping, and the menu settings.
+# Simple controls (fists, chains), difficulty, FPS mode, digging by hand, knapping, and the menu settings.
 import asyncio, sys
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'helpers'))
@@ -117,6 +117,16 @@ async def main():
     await h.ev("mouse.ux = %d; mouse.uy = %d; render(1);" % (x + 130 + 59, y + hh - 19 + 6))
     im = await h.shot(); im.save(shot('pause_settings.png'))
     await h.ev("render(1); mouse.ux = %d; mouse.uy = %d; uiMouseDown(0);" % (x + 8 + 59, y + hh - 19 + 6)); cyc.append(await h.ev("SETTINGS.combat"))
+    fps = []
+    for i in range(3):
+        await h.ev("render(1); mouse.ux = %d; mouse.uy = %d; uiMouseDown(0);" % (x + 130 + 59, y + hh - 36 + 6))
+        fps.append(await h.ev("SETTINGS.fpsMode"))
+    await h.ev("G.parts.length = 0; G.biome = 'reach'; G.time = 3; ambient();")
+    ambientCounts = [await h.ev("G.parts.length")]
+    await h.ev("render(1); mouse.ux = %d; mouse.uy = %d; uiMouseDown(0); G.parts.length = 0; ambient();" % (x + 130 + 59, y + hh - 36 + 6))
+    ambientCounts.append(await h.ev("G.parts.length"))
+    await h.ev("render(1); mouse.ux = %d; mouse.uy = %d; uiMouseDown(0);" % (x + 130 + 59, y + hh - 36 + 6))
+    res['I fps mode'] = [fps, ambientCounts, await h.ev("localStorage.getItem('ew_settings')")]
     res['I pause cycle'] = cyc
     res['I stored'] = await h.ev("localStorage.getItem('ew_settings')")
     await h.ev("UI.open = 'journal'; UI.jtab = 'leads'; render(1);")
