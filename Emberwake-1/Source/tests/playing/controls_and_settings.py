@@ -91,6 +91,22 @@ async def main():
     res['G damage taken'] = out
     await h.ev("SETTINGS.diff = 'easy'")
 
+    # N. dash stamina recovers slowly after its delay, then allows another dash
+    await put(0)
+    regen = await h.ev("""(() => {
+      const p = G.p, I = { md: 0, jumpP: false, jumpH: false, down: false, l: false, r: false, lp: false, rp: false, dodgeP: false, wx: p.x + 30, wy: p.y + 7, armP: false };
+      p.stam = 0; p.stamDelay = 2; p.dodgeCd = 0; p.hurtT = 0; p.state = 'normal'; p.atk = null; p.onGround = true; p.vx = p.vy = 0;
+      tickFighter(p, I); tickFighter(p, I); const duringDelay = p.stam;
+      for (let i = 0; i < 121; i++) tickFighter(p, I);
+      const restored = p.stam;
+      I.dodgeP = true; I.md = 1; tickFighter(p, I);
+      const dashed = p.state === 'dodge';
+      p.stam = p.maxstam; p.stamDelay = p.dodgeCd = p.dbuf = p.iDodge = p.dodgeT = 0; p.state = 'normal'; p.onGround = true; p.vx = p.vy = 0;
+      return { duringDelay, restored, dashed };
+    })()""")
+    res['N dash stamina regen'] = regen
+    assert regen['duringDelay'] == 0 and regen['restored'] >= 12 and regen['dashed'], regen
+
     # L. a carried item with ground under the cursor still digs by hand
     await put(0); await h.ev("hold('flint')")
     tile0 = await h.ev("tileAt(%d + 1, %d)" % (x0, gy))

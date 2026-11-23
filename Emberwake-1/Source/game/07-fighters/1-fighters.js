@@ -98,6 +98,8 @@ function tickFighter(f, I) {
   if (f.comboTagT > 0) f.comboTagT--; else f.comboTag = '';
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
+  if (f.stamDelay > 0) f.stamDelay--;
+  else if (f.stam < f.maxstam) f.stam = min(f.maxstam, f.stam + .1 * (f === G.p ? gearMul('st') : 1));
   if (f.attackInputCd > 0) f.attackInputCd--; if (f.duelCooldown > 0) f.duelCooldown--;
   if (f.chainT > 0) f.chainT--; if (f.hurtT > 0) f.hurtT--; if (f.landT > 0) f.landT--; if (f.healCd > 0) f.healCd--; if (f.placeCd > 0) f.placeCd--;
   if (f.takenT > 0 && --f.takenT <= 0) f.taken = 0;
@@ -108,7 +110,6 @@ function tickFighter(f, I) {
   if (I.armP && f.hurtT <= 0) throwArm(f, I.wx, I.wy);
   if (I.jumpP) f.jbuf = 7; else if (f.jbuf > 0) f.jbuf--;
   if (f.onGround) { f.coyote = 6; f.airDash = airDashMax(f); f.updraft = true; f.dblUsed = false; } else if (f.coyote > 0) f.coyote--;
-  if (f.stamDelay > 0) f.stamDelay--;
   f.regenT++;
   const W = heldOf(f), isW = W && W.type === 'weapon', free = f.hurtT <= 0;
   if (isW && free) {

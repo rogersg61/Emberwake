@@ -269,7 +269,11 @@ function cancelDuelQueue() {
 }
 function arenaRespawn(f) {
   let best = ARENA_SPAWNS[0], bd = -1;
-  for (const s of ARENA_SPAWNS) { let d = 1e9; for (const o of G.fighters) if (o !== f && !o.dead) d = min(d, hypot(o.x / T - s[0], o.y / T - s[1])); d += Math.random() * 6; if (d > bd) { bd = d; best = s; } }
+  if (NET.duelMode && !WORLD.royale) {
+    best = NET.me > NET.duelPeer ? [78, 58] : [72, 58];
+  } else {
+    for (const s of ARENA_SPAWNS) { let d = 1e9; for (const o of G.fighters) if (o !== f && !o.dead) d = min(d, hypot(o.x / T - s[0], o.y / T - s[1])); d += Math.random() * 6; if (d > bd) { bd = d; best = s; } }
+  }
   reviveFighter(f, best[0] * T + 1, best[1] * T - 21); f.inv = 90;
   if (f === G.p) snapCam(); else { f.wid = fpick(ECHO_WEAPONS); f.arms = [fpick(ARMS), fpick(ARMS)]; }
   burst(f.x + 3, f.y + 10, 24, SPARK, 2.4, 40, { glow: 1 });

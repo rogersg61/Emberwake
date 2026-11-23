@@ -41,6 +41,14 @@ async def main():
         assert await wait(second, "G.state === 'play' && NET.duelQueueState === 'playing'")
         assert await first.evaluate("NET.peers.size === 1 && NET.duelMode === 'sword'")
         assert await second.evaluate("NET.peers.size === 1 && NET.duelMode === 'sword'")
+        for player in (first, second):
+            visible = await player.evaluate("""(() => {
+              const e = [...NET.peers.values()][0], c = G.cam;
+              return { visible: !!e && e.x + e.w > c.x && e.x < c.x + VS.vw && e.y + e.h > c.y && e.y < c.y + VS.vh,
+                me: NET.me, peer: NET.duelPeer, mode: NET.duelMode, p: [G.p.x, G.p.y], other: e && [e.x, e.y],
+                cam: [c.x, c.y, VS.vw, VS.vh], snaps: e && e.snaps.length };
+            })()""")
+            assert visible['visible'], visible
         combat = await first.evaluate("""(() => {
           const p = G.p, e = [...NET.peers.values()][0], input = { wx: p.x + 30, wy: p.y + 7, md: 0 };
           p.inv = 0; p.iDodge = 0; p.duelCooldown = 0; p.duelRange = 0; p.state = 'normal'; p.atk = null;

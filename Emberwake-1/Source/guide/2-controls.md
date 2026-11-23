@@ -4,7 +4,7 @@
 | --- | --- |
 | **A / D** | move |
 | **Space** or **W** | jump (hold **S** to drop through bridges) |
-| **Shift** | dodge (dodge through a hit at the last moment, then strike back: a riposte) |
+| **Shift** | dodge (spends stamina; the bar refills slowly after a short pause; dodge through a hit for a riposte) |
 | **Left mouse** | light attack. Click once per swing and wait for the gold recovery window. Holding the button does not attack. Clicking a creature always punches it, whatever you hold |
 | **Right mouse** or **Q** | heavy attack (hold to charge; release outside wind-up). Wait for the recovery window before another heavy; also opens doors |
 | **V** | change weapon style (five per weapon, unlocked by training) |
