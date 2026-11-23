@@ -5782,6 +5782,11 @@ function startAttack(f, btn, I, force) {
   if (!duel && !force && tryLink(f, btn)) return true;
   const set = MOVESETS[W.set], c = atkContext(f, I); let id = duel ? 'duel_strike' : force || resolveMove(set, btn, c); if (!duel && !force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
+  if (f.isPlayer) {
+    f.comboSeq = ((f.comboSeq || '') + btn).slice(-4);
+    f.comboT = 150;
+    f.comboN = min(6, (f.comboN || 0) + 1);
+  }
   if (duel) m = Object.assign({}, m, { reach: duelWeaponRange(f, W) / max(1, ARM + W.len) });
   if (force) { if (m.cost) { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
   else if (m.rise && c.air) { if (!f.updraft) { id = btn === 'L' ? set.map.aChain[0] : set.map.ha; m = set.moves[id]; } else f.updraft = false; }
@@ -5792,11 +5797,13 @@ function startAttack(f, btn, I, force) {
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
+  if (f.isPlayer && f.comboN > 1) {
+    a.tm = (a.tm || 1) * max(.72, 1 - (f.comboN - 1) * .055);
+    a.act = max(3, round(a.act * .82));
+  }
   if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 20; }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
-  const timingMul = timing === 'perfect' ? 1.5 : timing === 'rushed' ? .55 : timing === 'steady' ? 1.12 : 1;
-  a.gm = (a.gm || 1) * timingMul;
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -5934,6 +5941,17 @@ function reflectProj(pr, a) {
   fsx(a.f, 'reflect'); sparks(pr.x, pr.y, 10); numPop(pr.x, pr.y - 6, 'DEFLECT', '#8ff5e6'); if (a.f === G.p) { G.hitstop = max(G.hitstop, 3); comboHit(true); }
 }
 function comboHit(fresh) { const c = G.combo; c.n++; c.t = 180; c.pts += fresh ? 3 : 1; }
+function comboResolve(f, a) {
+  if (!f.isPlayer || !f.comboSeq) return null;
+  const s = f.comboSeq;
+  if (s.endsWith('LLL')) return { name: 'TRIPLE EDGE', mul: 1.38, flow: 'open', launch: 0 };
+  if (s.endsWith('LLH')) return { name: 'CROSS BREAK', mul: 1.5, flow: 'down', launch: 1 };
+  if (s.endsWith('LHH')) return { name: 'HEAVY RECOIL', mul: 1.42, flow: 'open', launch: 0 };
+  if (s.endsWith('HLL')) return { name: 'REBOUND', mul: 1.32, flow: 'open', launch: 0 };
+  if (s.endsWith('HHH')) return { name: 'WORLD CRUSH', mul: 1.65, flow: 'down', launch: 0 };
+  if (s.endsWith('HLH')) return { name: 'TURNING GALE', mul: 1.48, flow: 'open', launch: 1 };
+  return null;
+}
 function hitFx(hx, hy, top, dmg, o, kx, involved) {
   numPop(hx, top - 4, dmg, o.crit ? '#ffd35a' : '#ffffff', o.crit ? 2 : 1); sparks(hx, hy, o.crit ? 12 : 6, sign(kx), 2.4, o.cold ? FROST : SPARK); if (o.blunt) dust(hx, hy, 4);
   G.trails.push({ kind: 'hit', x: hx, y: hy, life: 5, max: 5, a: frand(TAU), big: o.crit || o.stop >= 5 });
@@ -5952,14 +5970,20 @@ function applyHit(a, e, hx, hy) {
   const f = a.f, m = a.m, root = e.root || e, last = a.hits.get(root);
   if (last !== undefined && (!m.multi || a.pt - last < m.multi)) return; a.hits.set(root, a.pt);
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
-  const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
-  const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
-  const timingDmg = a.timing === 'perfect' ? 1.45 : a.timing === 'steady' ? 1.12 : a.timing === 'rushed' ? .55 : 1;
-  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * timingDmg * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
+  const crit = a.crit || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
+  const chain = P0 ? comboResolve(f, a) : null;
+  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (chain ? chain.mul : 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
   const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
-  if (!strike(f, e, dmg, kx, m.kb[1], { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  const launch = chain && chain.launch ? 1 : m.launch;
+  if (!strike(f, e, dmg, kx, chain && chain.flow === 'down' ? -3.4 : m.kb[1], { stagger: chain && chain.flow === 'down' ? max(m.stagger || 0, 55) : m.stagger, launch, crit, stop: (m.stop || 0) + (chain ? 3 : 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  if (P0 && chain) {
+    f.comboTag = chain.name; f.comboTagT = 90;
+    numPop(hx, hy - 12, chain.name, '#ffd35a', .9);
+    sparks(hx, hy, 12, a.face, 2.4, ['#ffd35a', '#fff1a8', '#8ff5e6']);
+    f.comboSeq = '';
+  }
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }
@@ -6896,6 +6920,7 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
+    comboSeq: '', comboT: 0, comboN: 0, comboTag: '', comboTagT: 0
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal'
   };
   Object.assign(f, o);
@@ -6967,6 +6992,8 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.comboT > 0) f.comboT--; else { f.comboSeq = ''; f.comboN = 0; }
+  if (f.comboTagT > 0) f.comboTagT--; else f.comboTag = '';
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
   if (f.attackInputCd > 0) f.attackInputCd--;
@@ -6988,20 +7015,9 @@ function tickFighter(f, I) {
       if (f.attackInputCd <= 0) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
-          const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
-          const prog = clamp(f.atk.pt / rec, 0, 1);
-          const set = f.atk.W.set;
-          const window = set === 'maul' ? [.82, .90] : set === 'fangs' ? [.78, .94] : set === 'bow' ? [.84, .96] : set === 'chuks' ? [.80, .92] : set === 'brawl' ? [.76, .92] : [.80, .92];
-          if (prog >= .68) {
-            f.atkTiming = prog >= window[0] && prog <= window[1] ? 'perfect' : 'steady';
-            f.buf = { b, t: 10 };
-            f.attackInputCd = 8;
-            if (f === G.p) numPop(f.x + 3, f.y - 12, f.atkTiming === 'perfect' ? 'PERFECT' : 'TIMED', f.atkTiming === 'perfect' ? '#ffd35a' : '#7ddc6f');
-          } else {
-            f.atkTiming = 'rushed';
-            f.attackInputCd = 18;
-            if (f === G.p) numPop(f.x + 3, f.y - 12, 'WAIT', '#ff8a3d');
-          }
+          f.atkTiming = 'normal';
+          f.buf = { b, t: 10 };
+          f.attackInputCd = 4;
         }
       }
     }
@@ -9424,6 +9440,7 @@ function drawDuelQueue(c) {
 function drawHUD(c) {
   const p = G.p, uw = VS.uw, uh = VS.uh, A = WORLD.arena;
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
+  if (!A && p.comboTag && p.comboTagT > 0) textS(c, p.comboTag, 15, 37, '#ffd35a');
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (A && NET.duelMode && !NET.spectating) {

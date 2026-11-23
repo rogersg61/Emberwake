@@ -280,6 +280,11 @@ function startAttack(f, btn, I, force) {
   if (!duel && !force && tryLink(f, btn)) return true;
   const set = MOVESETS[W.set], c = atkContext(f, I); let id = duel ? 'duel_strike' : force || resolveMove(set, btn, c); if (!duel && !force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
+  if (f.isPlayer) {
+    f.comboSeq = ((f.comboSeq || '') + btn).slice(-4);
+    f.comboT = 150;
+    f.comboN = min(6, (f.comboN || 0) + 1);
+  }
   if (duel) m = Object.assign({}, m, { reach: duelWeaponRange(f, W) / max(1, ARM + W.len) });
   if (force) { if (m.cost) { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
   else if (m.rise && c.air) { if (!f.updraft) { id = btn === 'L' ? set.map.aChain[0] : set.map.ha; m = set.moves[id]; } else f.updraft = false; }
@@ -290,11 +295,13 @@ function startAttack(f, btn, I, force) {
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
+  if (f.isPlayer && f.comboN > 1) {
+    a.tm = (a.tm || 1) * max(.72, 1 - (f.comboN - 1) * .055);
+    a.act = max(3, round(a.act * .82));
+  }
   if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 20; }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
-  const timingMul = timing === 'perfect' ? 1.5 : timing === 'rushed' ? .55 : timing === 'steady' ? 1.12 : 1;
-  a.gm = (a.gm || 1) * timingMul;
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -432,6 +439,17 @@ function reflectProj(pr, a) {
   fsx(a.f, 'reflect'); sparks(pr.x, pr.y, 10); numPop(pr.x, pr.y - 6, 'DEFLECT', '#8ff5e6'); if (a.f === G.p) { G.hitstop = max(G.hitstop, 3); comboHit(true); }
 }
 function comboHit(fresh) { const c = G.combo; c.n++; c.t = 180; c.pts += fresh ? 3 : 1; }
+function comboResolve(f, a) {
+  if (!f.isPlayer || !f.comboSeq) return null;
+  const s = f.comboSeq;
+  if (s.endsWith('LLL')) return { name: 'TRIPLE EDGE', mul: 1.38, flow: 'open', launch: 0 };
+  if (s.endsWith('LLH')) return { name: 'CROSS BREAK', mul: 1.5, flow: 'down', launch: 1 };
+  if (s.endsWith('LHH')) return { name: 'HEAVY RECOIL', mul: 1.42, flow: 'open', launch: 0 };
+  if (s.endsWith('HLL')) return { name: 'REBOUND', mul: 1.32, flow: 'open', launch: 0 };
+  if (s.endsWith('HHH')) return { name: 'WORLD CRUSH', mul: 1.65, flow: 'down', launch: 0 };
+  if (s.endsWith('HLH')) return { name: 'TURNING GALE', mul: 1.48, flow: 'open', launch: 1 };
+  return null;
+}
 function hitFx(hx, hy, top, dmg, o, kx, involved) {
   numPop(hx, top - 4, dmg, o.crit ? '#ffd35a' : '#ffffff', o.crit ? 2 : 1); sparks(hx, hy, o.crit ? 12 : 6, sign(kx), 2.4, o.cold ? FROST : SPARK); if (o.blunt) dust(hx, hy, 4);
   G.trails.push({ kind: 'hit', x: hx, y: hy, life: 5, max: 5, a: frand(TAU), big: o.crit || o.stop >= 5 });
@@ -450,14 +468,20 @@ function applyHit(a, e, hx, hy) {
   const f = a.f, m = a.m, root = e.root || e, last = a.hits.get(root);
   if (last !== undefined && (!m.multi || a.pt - last < m.multi)) return; a.hits.set(root, a.pt);
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
-  const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
-  const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
-  const timingDmg = a.timing === 'perfect' ? 1.45 : a.timing === 'steady' ? 1.12 : a.timing === 'rushed' ? .55 : 1;
-  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * timingDmg * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
+  const crit = a.crit || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
+  const chain = P0 ? comboResolve(f, a) : null;
+  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (chain ? chain.mul : 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
   const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
-  if (!strike(f, e, dmg, kx, m.kb[1], { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  const launch = chain && chain.launch ? 1 : m.launch;
+  if (!strike(f, e, dmg, kx, chain && chain.flow === 'down' ? -3.4 : m.kb[1], { stagger: chain && chain.flow === 'down' ? max(m.stagger || 0, 55) : m.stagger, launch, crit, stop: (m.stop || 0) + (chain ? 3 : 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  if (P0 && chain) {
+    f.comboTag = chain.name; f.comboTagT = 90;
+    numPop(hx, hy - 12, chain.name, '#ffd35a', .9);
+    sparks(hx, hy, 12, a.face, 2.4, ['#ffd35a', '#fff1a8', '#8ff5e6']);
+    f.comboSeq = '';
+  }
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }

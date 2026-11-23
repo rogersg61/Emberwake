@@ -392,6 +392,7 @@ function drawDuelQueue(c) {
 function drawHUD(c) {
   const p = G.p, uw = VS.uw, uh = VS.uh, A = WORLD.arena;
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
+  if (!A && p.comboTag && p.comboTagT > 0) textS(c, p.comboTag, 15, 37, '#ffd35a');
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (A && NET.duelMode && !NET.spectating) {
