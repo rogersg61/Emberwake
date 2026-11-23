@@ -266,23 +266,33 @@ function noteMove(f, setName, id, m, fresh) {
   G.feed.unshift({ name: m.name, fresh, isNew, t: 0 }); if (G.feed.length > 5) G.feed.pop();
   G.movesUsed.add(key);
 }
+for (const [name, set] of Object.entries(MOVESETS)) {
+  set.moves.duel_strike = mv('Strike', 'L', 'LMB', {
+    kind: name === 'bow' ? 'shot' : 'thrust', wind: 3, act: 4, rec: 12, dmg: 1,
+    kb: [.6, -.25], reach: 1, lo: -18, hi: 18,
+    arrows: name === 'bow' ? { n: 1, v: 7, g: .01 } : undefined
+  });
+}
+function duelWeaponRange(f, W) { return (W.set === 'bow' ? 165 : ARM + W.len) + min(18, f.duelRange || 0); }
 function startAttack(f, btn, I, force) {
   const W = heldOf(f); if (!W || W.type !== 'weapon') return false;
-  if (f.isPlayer && (f.snapped || 0) > 0) {
+  const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode;
+  if (!duel && f.isPlayer && (f.snapped || 0) > 0) {
     sfx('deny');
     if (f === G.p) numPop(f.x + 3, f.y - 12, 'SNAPPED', '#e2483b', .8);
     f.stamDelay = 18;
     return false;
   }
-  if (!force && tryLink(f, btn)) return true;
-  const set = MOVESETS[W.set], c = atkContext(f, I); let id = force || resolveMove(set, btn, c); if (!force && f === G.p) id = famGate(W.set, set, id, btn, c);
+  if (!duel && !force && tryLink(f, btn)) return true;
+  const set = MOVESETS[W.set], c = atkContext(f, I); let id = duel ? 'duel_strike' : force || resolveMove(set, btn, c); if (!duel && !force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
-  if (f.isPlayer) {
+  if (duel) m = Object.assign({}, m, { reach: duelWeaponRange(f, W) / max(1, ARM + W.len) });
+  if (f.isPlayer && !duel) {
     if (f.paceRepeat === id) f.paceRepeatN = min(6, (f.paceRepeatN || 0) + 1);
     else { f.paceRepeat = id; f.paceRepeatN = 1; }
     f.paceRepeatT = 120;
   }
-  if (f.isPlayer) {
+  if (f.isPlayer && !duel) {
     if (f.lastMove === id) {
       f.dissonance = min(100, (f.dissonance || 0) + 7);
       f.fray = min(100, (f.fray || 0) + 5);
@@ -300,7 +310,7 @@ function startAttack(f, btn, I, force) {
     if (f.stam < m.cost * .6) { if (f === G.p) sfx('deny'); id = resolveMove(set, 'L', c); if (f === G.p) id = famGate(W.set, set, id, 'L', c); m = set.moves[id]; if (m.rise && c.air) { id = set.map.aChain[0]; m = set.moves[id]; } }
     else { const fray = f.isPlayer ? (f.fray || 0) : 0, rush = (f.atkTiming || 'normal') === 'rushed'; const cost = round(m.cost * (1 + (fray >= 70 ? .5 : fray >= 40 ? .25 : 0) + (rush ? .35 : 0))); f.stam = max(0, f.stam - cost); f.stamDelay = 42; }
   }
-  const rep = f.hist.slice(-4).filter(h => h === id).length, fresh = !f.hist.slice(-3).includes(id);
+  const rep = duel ? 0 : f.hist.slice(-4).filter(h => h === id).length, fresh = duel || !f.hist.slice(-3).includes(id);
   f.hist.push(id); if (f.hist.length > 8) f.hist.shift();
   f.face = c.side; f.state = 'attack'; f.chainT = 0; f.mineP = 0;
   const timing = f.atkTiming || 'normal';
@@ -310,10 +320,11 @@ function startAttack(f, btn, I, force) {
     f.beatStanceT = 180;
   }
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
-  if (f.isPlayer) {
+  if (f.isPlayer && !duel) {
     const paceBase = max(10, round((m.wind + m.act + m.rec) * (m.big ? .24 : .18)));
     f.paceLock = paceBase + (f.paceRepeatN > 2 ? min(12, f.paceRepeatN * 3) : 0) + (f.paceDebt > 40 ? 8 : 0);
   }
+  if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 20; }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
   const timingMul = timing === 'perfect' ? 1.38 : timing === 'rushed' ? .58 : timing === 'steady' ? 1.16 : 1;
@@ -386,6 +397,10 @@ function tickAttack(f, I) {
 }
 function beginActive(a) {
   const f = a.f, m = a.m, fc = a.face;
+  if (WORLD.arena && !WORLD.royale && NET.duelMode) {
+    a.duelDamageMul = !f.onGround && f.vy > 1.2 ? 1.25 : 1;
+    a.duelSprint = hypot(f.vx, f.vy) > 1.2;
+  }
   if (m.plant) f.vx = fc * max(m.step || 0, min(f.vx * fc, .9));
   else if (m.step) f.vx = fc * max(m.step, f.vx * fc);
   if (m.back) f.vx = -fc * m.back;
@@ -422,7 +437,8 @@ function fireArrows(a, count) {
     let vx, vy, g = A.g === undefined ? .05 : A.g;
     if (A.rain) { const tx = a.tx + (A.n > 1 ? (a.shotI - (A.n - 1) / 2) * 10 : 0) + frand(-3, 3), Tf = A.tf || 46; g = .16; vx = clamp((tx - sx) / Tf, -7, 7); vy = (a.ty - sy - .5 * g * Tf * Tf) / Tf; }
     else { const v = A.v || 6.5; if (A.radial) { const th = a.shotI / A.n * TAU; vx = cos(th) * v; vy = sin(th) * v; } else { const th = a.th + (A.spread ? (a.shotI - (A.n - 1) / 2) * A.spread : 0) + (A.burst ? frand(-.025, .025) : 0); vx = fc * cos(th) * v; vy = sin(th) * v; } }
-    spawnProj({ type: A.boom ? 'bomb' : 'arrow', owner: f, x: sx, y: sy, vx, vy, g, r: 3, dmg: max(1, round(a.W.dmg * m.dmg * a.stale * (f.dmgMul || 1))), pierce: !!A.pierce, boom: A.boom || 0, life: 190, kb: [m.kb[0], m.kb[1]], crit: a.crit, stagger: m.stagger, stop: m.stop });
+    const duel = WORLD.arena && !WORLD.royale && NET.duelMode, kick = duel && a.duelSprint;
+    spawnProj({ type: A.boom ? 'bomb' : 'arrow', owner: f, x: sx, y: sy, vx, vy, g, r: 3, dmg: max(1, round(a.W.dmg * m.dmg * a.stale * (f.dmgMul || 1) * (duel ? a.duelDamageMul || 1 : 1))), pierce: !!A.pierce, boom: A.boom || 0, life: duel ? clamp(round((a.duelRange || 165) / max(1, A.v || 6.5)), 12, 190) : 190, kb: kick ? [5.2, -1.8] : m.kb, crit: a.crit, stagger: m.stagger, stop: m.stop });
   }
   fsx(f, 'bolt', 0); fsx(f, 'thrust', 0);
 }
@@ -639,8 +655,9 @@ function hitFx(hx, hy, top, dmg, o, kx, involved) {
 function strike(by, e, dmg, kx, ky, o) {
   if (!e.fighter) { const r = damageEnemy(e, dmg, kx, ky, o) > 0; if (r && o.launch && !e.dead && !o.link) applyStatus(e, 'launched', by); return r; }
   const hx = o.hx === undefined ? e.x + 3 : o.hx, hy = o.hy === undefined ? e.y + 10 : o.hy;
-  if (e.remote) { if (e.dead || e.spawnT > 0 || e.noHit) return false; netHit(e, dmg, kx, ky, o.crit, 0, by); e.flash = 6; hitFx(hx, hy, e.y, max(1, round(dmg * .8)), o, kx, by === G.p); return true; }
+  if (e.remote) { if (e.dead || e.spawnT > 0 || e.noHit) return false; netHit(e, dmg, kx, ky, o.crit, 0, by); e.flash = 6; hitFx(hx, hy, e.y, max(1, round(dmg * .8)), o, kx, by === G.p); if (WORLD.arena && !WORLD.royale && NET.duelMode && by) by.duelRange = min(18, (by.duelRange || 0) + 2.5); return true; }
   const r = hurtFighter(e, dmg, by ? by.x + 3 : hx - kx, { kx, ky, by, pvp: !!(by && by.fighter), stop: o.stop, shake: o.shake, crit: o.crit, stagger: o.stagger, blunt: o.blunt, launch: o.launch, cold: o.cold, hx, hy, link: o.link });
+  if (r && WORLD.arena && !WORLD.royale && NET.duelMode && by) by.duelRange = min(18, (by.duelRange || 0) + 2.5);
   if (r && o.launch && !e.dead && !o.link) applyStatus(e, 'launched', by); return r;
 }
 function applyHit(a, e, hx, hy) {
@@ -649,18 +666,21 @@ function applyHit(a, e, hx, hy) {
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
   const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
   const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
-  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
-  if (P0) {
+  const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode, falling = duel && !f.onGround && f.vy > 1.2, sprint = duel && abs(f.vx) > 1.2;
+  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1) * (falling ? 1.25 : 1);
+  if (P0 && !duel) {
     const repeated = (f.paceRepeat === a.id ? (f.paceRepeatN || 1) : 1);
     if (repeated >= 3) dmg *= max(.45, 1 - (repeated - 2) * .14);
   }
-  const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
+  const lk = P0 && !duel ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
   dmg = max(1, round(dmg * frand(.93, 1.07)));
-  let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
-  if (!strike(f, e, dmg, kx, m.kb[1], { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  let kx = m.kb[0] * a.face, ky = m.kb[1];
+  if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
+  if (duel) { kx = sprint ? 5.2 * a.face : .6 * a.face; ky = sprint ? -1.8 : -.25; }
+  if (!strike(f, e, dmg, kx, ky, { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
   if (a.echo) { a.echo = 0; strike(f, e, max(1, round(dmg * .45)), kx * .6, m.kb[1] * .5, { stagger: 12, crit: false, stop: 2, blunt: m.blunt, cold: a.W.cold, hx, hy }); }
   if (P0) combatTempoHit(f, a, e);
-  if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
+  if (P0 && !duel) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }
   if (a.W.steal && f.hp < f.maxhp) { f.hp = min(f.maxhp, f.hp + max(1, round(dmg * a.W.steal))); }

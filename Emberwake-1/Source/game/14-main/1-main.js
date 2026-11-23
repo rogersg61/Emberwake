@@ -407,7 +407,7 @@ function ambient() {
 }
 function snapCam() { const p = G.p; G.cam.x = G.cam.px = camX(p.x + 3 - VS.vw / 2); G.cam.y = G.cam.py = camY(p.y + 4 - VS.vh / 2 - 8); }
 function tickCam() {
-  const c = G.cam, p = brCamTarget() || G.p; c.px = c.x; c.py = c.y;
+  const c = G.cam, watchers = NET.spectating ? G.fighters.filter(f => f.remote && !f.dead) : [], p = watchers.length ? { x: watchers.reduce((n, f) => n + f.x, 0) / watchers.length, y: watchers.reduce((n, f) => n + f.y, 0) / watchers.length } : brCamTarget() || G.p; c.px = c.x; c.py = c.y;
   const lx = (mouse.x / VS.s - VS.vw / 2) * .15, ly = (mouse.y / VS.s - VS.vh / 2) * .15, free = !UI.open && !G.dialog && !G.cine && !G.link;
   const spy = G.spy && free && !WORLD.arena && hasItem('spyglass') ? 1 : 0; if (G.spy && !spy && !hasItem('spyglass')) G.spy = false;
   let tx = p.x + 3 - VS.vw / 2 + (free ? lx * (1 + spy * 9) : 0), ty = p.y + 4 - VS.vh / 2 + (free ? ly * (1 + spy * 7) : 0) - (G.boss ? 22 : 8), k = spy ? .06 : .14;
@@ -463,6 +463,7 @@ function frame(now) {
     if (G.state !== 'play' && G.state !== 'intro') { c.x += .3; if (WORLD.endless) { streamTo(c.x + VS.vw / 2); if (c.x > (SPAWN_X + 600) * T) c.x = c.px = (SPAWN_X - 200) * T; } else if (c.x > WW * T - VS.vw - 2) c.x = c.px = 0; const hx = clamp(floor((c.x + VS.vw / 2) / T), 0, WW - 1); c.y += (camY(heights[hx] * T - VS.vh * .62) - c.y) * .02; c.x = camX(c.x); }
     if (G.state === 'intro') G.introT++;
     if (BR.on && G.state === 'brlobby') brLobbyTick();
+    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     G.shake *= .86; G.flash *= .88; acc = 1;
     if (WORLD.arena && G.state === 'play' && G.time % 3 === 0) netSend();
   }
@@ -477,11 +478,12 @@ let rafT = 0, bgLast = 0;
 function bgStep() {
   const now = performance.now(); if (now - rafT < 400) { bgLast = now; return; }
   try { sigTick(); if (COOP.role) pingTick(now); } catch (e) { }
-  const live = netLive() || (BR.on && BR.via !== 'solo' && (G.state === 'play' || G.state === 'brlobby'));
+  const live = netLive() || G.state === 'duelQueue' || (WORLD.arena && NET.duelMode) || (BR.on && BR.via !== 'solo' && (G.state === 'play' || G.state === 'brlobby'));
   if (!live || G.manual) { bgLast = now; return; }
   const dt = min(.5, (now - (bgLast || now)) / 1000); bgLast = now; G.away = !WORLD.arena;
   try {
     if (G.state === 'play') { acc += dt * 60; let n = 0; while (acc >= 1 && n < 40) { if (G.hitstop > 0) G.hitstop--; else tick(); acc -= 1; n++; } if (n >= 40) acc = 0; }
+    else if (G.state === 'duelQueue') duelQueueTick();
     else if (BR.on && G.state === 'brlobby') brLobbyTick();
   } catch (e) { console.warn('bg', e); }
 }
@@ -532,6 +534,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return; keys[k] = true; pressed[k] = true;
   if (G.state === 'intro') { if (k === 'Enter' || k === 'Space') { audioInit(); advance(); } return; }
   if (G.state === 'brlobby') { if (k === 'Escape') { brLeave(); sfx('ui'); } return; }
+  if (G.state === 'duelQueue') { if (k === 'Escape') cancelDuelQueue(); return; }
   if (G.state !== 'play') { if (k === 'Escape') { if (G.state === 'accounts' && !ACCOUNT.active) return; G.state = ['create', 'wcopy', 'wpaste'].includes(G.state) ? 'worlds' : 'title'; if (G.state === 'accounts') ACCOUNT.form = 'list'; if (G.state === 'title' && COOP.role) coopLeave(); sfx('ui'); } return; }
   if (G.dialog) { if (k === 'KeyF' || k === 'Space' || k === 'Enter' || k === 'KeyE') { dialogAdvance(); pressed[k] = false; } return; }
   if (k === 'Escape' || k === 'KeyP') { if (UI.open) { closeUI(); sfx('ui'); } else toggleUI('pause'); return; }

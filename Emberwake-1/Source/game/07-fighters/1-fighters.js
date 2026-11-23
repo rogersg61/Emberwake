@@ -59,6 +59,7 @@ function hurtFighter(f, dmg, fromX, o = {}) {
   if (f.iDodge > 0 && !o.link) { if (!f.perfected && (f.state === 'dodge' || f.dodgeGrace > 0)) perfectDodge(f); return false; }
   if (f.inv > (o.net ? 30 : o.link ? 999 : 0)) return false;
   if (f.state === 'link' && !o.link) return false;
+  if (o.pvp && WORLD.arena && NET.duelMode) f.duelRange = 0;
   const pvp = !!o.pvp, armored = f.atk && f.atk.m.armor && f.atk.phase < 2;
   const gp = f === G.p && gearOn(); if (gp) { dmg = gearDamage(dmg, o); if ((gearHas('kindled') || gearHas('molten')) && o.by && o.by !== f && !o.by.dead && o.by.hp !== undefined && !o.by.fighter) applyStatus(o.by, 'burn', f, { d: 90 }); }
   dmg = max(1, round(dmg * (pvp && WORLD.arena ? .8 : 1) * (armored ? .65 : 1) * (f.dmgTaken || 1) * (f === G.p && !WORLD.arena && !o.net ? DIFF().taken * blessTaken() : 1)));
@@ -117,7 +118,7 @@ function tickFighter(f, I) {
   }
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
-  if (f.attackInputCd > 0) f.attackInputCd--;
+  if (f.attackInputCd > 0) f.attackInputCd--; if (f.duelCooldown > 0) f.duelCooldown--;
   if (f.chainT > 0) f.chainT--; if (f.hurtT > 0) f.hurtT--; if (f.landT > 0) f.landT--; if (f.healCd > 0) f.healCd--; if (f.placeCd > 0) f.placeCd--;
   if (f.takenT > 0 && --f.takenT <= 0) f.taken = 0;
   if (f.armCd > 0) f.armCd--; if (f.throwT > 0) f.throwT--; if (f.veil > 0) f.veil--;
@@ -135,14 +136,14 @@ function tickFighter(f, I) {
   if (isW && free) {
     if (I.lp || I.rp) {
       const b = I.lp ? 'L' : 'H';
-      if (f.paceLock > 0) {
+      if (f.paceLock > 0 && !(WORLD.arena && !WORLD.royale && NET.duelMode)) {
         f.fray = min(100, (f.fray || 0) + 3);
         f.dissonance = min(100, (f.dissonance || 0) + 5);
         f.paceDebt = min(100, (f.paceDebt || 0) + 7);
         f.attackInputCd = 4;
         if (f === G.p && G.time % 12 === 0) numPop(f.x + 3, f.y - 12, 'COMMIT', '#ff8a3d', .7);
       } else
-      if (f.attackInputCd <= 0) {
+      if (f.attackInputCd <= 0 && (!(WORLD.arena && !WORLD.royale && NET.duelMode) || f.duelCooldown <= 0)) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
           const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
@@ -239,6 +240,7 @@ function playerInput() {
   };
 }
 function tickPlayer() {
+  if (NET.spectating) return;
   const p = G.p, I = playerInput();
   const held = heldOf(p);
   if (held && held.type === 'weapon') {

@@ -2,6 +2,12 @@
 
 Up to four people can play in one world. One of you hosts: it is their world, and they save it. It works on any internet connection: home Wi-Fi, a phone hotspot, a school or office network.
 
+## Duels
+
+Choose **DUELS : FIND A MATCH**, select **BOW**, **SWORD**, or **GRAPPLE SWORD**, then join that mode's queue. You stay in the queue screen until another player selects the same mode; matches are always one-on-one, and later arrivals cannot join a match already underway. Right-click **JOIN QUEUE** to watch a live duel in that mode.
+
+Duels use one strike per weapon with a cooldown. A successful hit increases your reach; when your opponent hits you, your reach returns to its starting value. A strike while moving sends the opponent flying farther, and a plain strike while falling deals 1.25 times its usual damage. **GRAPPLE SWORD** adds the hook on **R**.
+
 ## Hosting
 
 Open your world, press **Esc** and choose **PLAY TOGETHER**. Your game shows a **game code**, six letters and numbers like `K7P2QX`. Tell it to your friends: say it, text it, anything.

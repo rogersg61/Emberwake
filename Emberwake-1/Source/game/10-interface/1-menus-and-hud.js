@@ -406,18 +406,27 @@ function drawRingForm(c) {
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
   drawText(c, 'MODE', fx, y + 70, '#b9bdd0');
-  const modes = ['DUEL 1V1', 'QUICK SKIRMISH', 'FREE FOR ALL'];
+  const modes = ['BOW', 'SWORD', 'GRAPPLE SWORD'];
   modes.forEach((name, i) => button(c, fx + i * (fw / 3), y + 66, fw / 3 - 2, 16, name, () => { FORM.duelMode = i; sfx('ui'); }, { on: FORM.duelMode === i }));
-  const descriptions = ['First player to 10 takedowns wins.', 'Short match: paired opponents, fast respawns.', 'Every Waker fights every other Waker.'];
+  const descriptions = ['Long-range arrows.', 'A balanced close-range blade.', 'Sword strikes and a grappling hook.'];
   drawText(c, descriptions[FORM.duelMode], fx, y + 92, '#d8d4e6');
-  drawText(c, NET.room ? 'Automatic matchmaking available here.' : 'Automatic matchmaking uses the online relay.', fx, y + 108, NET.room ? '#7ddc6f' : '#8b8fa3');
-  drawText(c, 'Waiting for a suitable player. Echoes fill a practice match.', fx, y + 120, '#b9bdd0');
-  button(c, x + 10, y + h - 26, 150, 18, 'JOIN QUEUE', () => {
-    UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick; G.state = 'loading'; G.loadMsg = 'Finding a duel...';
-    const queueCode = 'duel-' + (['1v1', 'quick', 'ffa'][FORM.duelMode] || '1v1');
-    setTimeout(() => enterArena(nick, FORM.skin, queueCode), 30); sfx('quest', 0);
+  drawText(c, 'Only two players enter each match.', fx, y + 108, '#8b8fa3');
+  drawText(c, 'Right-click JOIN QUEUE to spectate a live duel.', fx, y + 120, '#b9bdd0');
+  button(c, x + 10, y + h - 26, 150, 18, 'JOIN QUEUE', b => {
+    UI.focus = null; const nick = cleanName(FORM.nick) || 'WAKER'; FORM.nick = nick;
+    const mode = ['bow', 'sword', 'grapple'][FORM.duelMode] || 'sword';
+    enterDuelQueue(mode, nick, FORM.skin, b === 2); sfx('quest', 0);
   });
   button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { G.state = 'title'; UI.focus = null; sfx('ui'); });
+}
+function drawDuelQueue(c) {
+  const uw = VS.uw, uh = VS.uh, w = min(300, uw - 16), h = 104, x = round((uw - w) / 2), y = round((uh - h) / 2);
+  c.fillStyle = 'rgba(18,13,31,.72)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'DUEL QUEUE');
+  const mode = NET.duelMode.toUpperCase(), watching = NET.spectateRequest;
+  textC(c, watching ? 'Looking for a live ' + mode + ' match...' : 'QUEUEING FOR ' + mode + ' DUEL', uw / 2, y + 31, '#ffd35a', 1, textO);
+  const status = NET.status === 'offline' ? 'Cannot reach the matchmaking relay.' : NET.status === 'online' ? 'Connected. Waiting for another player...' : 'Connecting to matchmaking...';
+  textC(c, status, uw / 2, y + 49, NET.status === 'offline' ? '#ffb347' : '#d8d4e6', 1, textO);
+  button(c, x + (w - 100) / 2, y + 72, 100, 17, 'CANCEL', cancelDuelQueue);
 }
 
 // ---------------- in-game HUD ----------------
@@ -427,6 +436,12 @@ function drawHUD(c) {
   if (!A) drawTempoHud(c);
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
+  if (A && NET.duelMode && !NET.spectating) {
+    const rw = 88, rx = round((uw - rw) / 2), ry = 4;
+    textC(c, 'RANGE ' + round((NET.duelMode === 'bow' ? 165 : 21.5) + (p.duelRange || 0)), uw / 2, ry, '#ffd35a', 1, textO);
+    bar(c, rx, ry + 9, rw, 3, (p.duelRange || 0) / 18, '#8ff5e6', '#2b2740');
+    if (p.duelCooldown > 0) textC(c, 'READY IN ' + (p.duelCooldown / 60).toFixed(1), uw / 2, ry + 15, '#d8d4e6', 1, textO);
+  }
   if (p.atk && p.atk.phase === 2) {
     const rec = max(1, round(p.atk.m.rec * (p.atk.tm || p.atk.W.wsp || 1))), prog = clamp(p.atk.pt / rec, 0, 1);
     const w = 120, x = round((uw - w) / 2), y = hotbarLayout().y - 30;
@@ -496,7 +511,7 @@ function drawRingStatus(c) {
   const uw = VS.uw, list = [...G.fighters].filter(f => !f.npc).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const w = 120, x = uw - w - 4; let y = 4;
   c.fillStyle = 'rgba(18,13,31,.62)'; c.fillRect(x, y, w, 13 + min(5, list.length) * 9); c.fillStyle = NET.status === 'online' ? '#7ddc6f' : '#ffb347'; c.fillRect(x, y, 2, 13 + min(5, list.length) * 9);
-  textS(c, `RING ${NET.code.toUpperCase()}`, x + 6, y + 3, '#ffd35a'); drawText(c, NET.status === 'online' ? 'live' : NET.status === 'connecting' ? '...' : 'solo', x + w - 24, y + 3, NET.status === 'online' ? '#7ddc6f' : '#ffb347');
+  textS(c, NET.duelMode ? NET.duelMode.toUpperCase() + ' DUEL' : `RING ${NET.code.toUpperCase()}`, x + 6, y + 3, '#ffd35a'); drawText(c, NET.status === 'online' ? 'live' : NET.status === 'connecting' ? '...' : 'solo', x + w - 24, y + 3, NET.status === 'online' ? '#7ddc6f' : '#ffb347');
   list.slice(0, 5).forEach((f, i) => { const yy = y + 13 + i * 9, me = f === G.p; drawText(c, (me ? '> ' : '') + f.name, x + 6, yy, me ? '#ffd35a' : f.echoBot ? '#b9bdd0' : '#8ff5e6'); drawText(c, String(f.kills), x + w - 8 - textW(f.kills), yy, '#fff'); });
   textC(c, ringStatusText(), uw / 2, 4, NET.status === 'online' ? '#7ddc6f' : '#ffb347', 1, textO);
   if (NET.roundOver) textC(c, 'next round in ' + ceil(NET.roundOver / 60), uw / 2, 14, '#fff', 1, textO);
@@ -632,7 +647,7 @@ function drawDialog(c) {
 }
 function drawUI(c) {
   HITS_NEXT = []; const uw = VS.uw, uh = VS.uh, st = G.state;
-  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'friends') drawFriends(c); else if (st === 'customize') drawCustomization(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'multiplayer') drawMultiplayer(c); else if (st === 'settings') drawSettings(c); else if (st === 'ring') drawRingForm(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
+  if (st === 'title') drawTitle(c); else if (st === 'accounts') drawAccounts(c); else if (st === 'friends') drawFriends(c); else if (st === 'customize') drawCustomization(c); else if (st === 'worlds') drawWorlds(c); else if (st === 'create') drawCreate(c); else if (st === 'multiplayer') drawMultiplayer(c); else if (st === 'settings') drawSettings(c); else if (st === 'ring') drawRingForm(c); else if (st === 'duelQueue') drawDuelQueue(c); else if (st === 'brform') drawBrForm(c); else if (st === 'brlobby') drawBrLobby(c); else if (st === 'join') drawJoin(c); else if (st === 'wcopy') drawWorldCopy(c); else if (st === 'wpaste') drawWorldPaste(c);
   else if (st === 'loading') { c.fillStyle = 'rgba(18,13,31,.82)'; c.fillRect(0, 0, uw, uh); textC(c, G.loadMsg || 'Loading...', uw / 2, round(uh * .45), '#fff1a8', 1, textO); const n = (performance.now() / 300 | 0) % 4; textC(c, '.'.repeat(n), uw / 2, round(uh * .45) + 12, '#ffd35a', 1, textO); }
   else if (st === 'intro') {
     c.fillStyle = 'rgba(18,13,31,.84)'; c.fillRect(0, 0, uw, uh);
