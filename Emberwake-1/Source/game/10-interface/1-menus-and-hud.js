@@ -395,7 +395,7 @@ function drawHUD(c) {
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (A && NET.duelMode && !NET.spectating) {
     const rw = 88, rx = round((uw - rw) / 2), ry = 4;
-    textC(c, 'RANGE ' + round((NET.duelMode === 'bow' ? 165 : 21.5) + (p.duelRange || 0)), uw / 2, ry, '#ffd35a', 1, textO);
+    textC(c, 'RANGE ' + round(duelWeaponRange(p, heldOf(p))), uw / 2, ry, '#ffd35a', 1, textO);
     bar(c, rx, ry + 9, rw, 3, (p.duelRange || 0) / 18, '#8ff5e6', '#2b2740');
     if (p.duelCooldown > 0) textC(c, 'READY IN ' + (p.duelCooldown / 60).toFixed(1), uw / 2, ry + 15, '#d8d4e6', 1, textO);
   }

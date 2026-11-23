@@ -44,6 +44,8 @@ async def main():
         combat = await first.evaluate("""(() => {
           const p = G.p, e = [...NET.peers.values()][0], input = { wx: p.x + 30, wy: p.y + 7, md: 0 };
           p.inv = 0; p.iDodge = 0; p.duelCooldown = 0; p.duelRange = 0; p.state = 'normal'; p.atk = null;
+          const startingRange = duelWeaponRange(p, IT.sword), clamped = duelAimPoint(p, IT.sword, p.x + 1000, p.y + 10);
+          const aimRange = Math.hypot(clamped.x - (p.x + 3), clamped.y - (p.y + 10));
           startAttack(p, 'H', input);
           const simple = p.atk.id === 'duel_strike' && p.atk.m.kind === 'thrust' && p.duelCooldown > 0;
           p.state = 'normal'; p.atk = null; p.duelCooldown = 15;
@@ -58,10 +60,11 @@ async def main():
           try {
             p.onGround = true; p.vy = 0; applyHit(a, e, e.x, e.y); const ground = NET.hits.at(-1)[2];
             a.pt = 20; a.hits.clear(); p.onGround = false; p.vy = 3; applyHit(a, e, e.x, e.y);
-            return { simple, cooldown, grew, reset, fallingRatio: NET.hits.at(-1)[2] / ground };
+            return { simple, cooldown, grew, reset, startingRange, aimRange, fallingRatio: NET.hits.at(-1)[2] / ground };
           } finally { Math.random = random; }
         })()""")
         assert combat['simple'] and combat['cooldown'] and combat['grew'] and combat['reset'], combat
+        assert combat['startingRange'] == 2 * 8 and abs(combat['aimRange'] - combat['startingRange']) < .01, combat
         assert 1.15 <= combat['fallingRatio'] <= 1.35, combat
 
         third = await page('CHARLIE')

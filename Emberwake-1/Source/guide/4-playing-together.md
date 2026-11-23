@@ -6,7 +6,7 @@ Up to four people can play in one world. One of you hosts: it is their world, an
 
 Choose **DUELS : FIND A MATCH**, select **BOW**, **SWORD**, or **GRAPPLE SWORD**, then join that mode's queue. You stay in the queue screen until another player selects the same mode; matches are always one-on-one, and later arrivals cannot join a match already underway. Right-click **JOIN QUEUE** to watch a live duel in that mode.
 
-Duels use one strike per weapon with a cooldown. A successful hit increases your reach; when your opponent hits you, your reach returns to its starting value. A strike while moving sends the opponent flying farther, and a plain strike while falling deals 1.25 times its usual damage. **GRAPPLE SWORD** adds the hook on **R**.
+Duels use one strike per weapon with a cooldown. Sword and grapple duels start with a two-block range; bow duels keep their longer range. Your crosshair stays inside the range circle. Each successful hit grows the circle, and when your opponent hits you, it snaps back to its starting size. A strike while moving sends the opponent flying farther, and a plain strike while falling deals 1.25 times its usual damage. **GRAPPLE SWORD** adds the hook on **R**.
 
 ## Hosting
 

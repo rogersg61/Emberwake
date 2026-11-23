@@ -273,7 +273,11 @@ for (const [name, set] of Object.entries(MOVESETS)) {
     arrows: name === 'bow' ? { n: 1, v: 7, g: .01 } : undefined
   });
 }
-function duelWeaponRange(f, W) { return (W.set === 'bow' ? 165 : ARM + W.len) + min(18, f.duelRange || 0); }
+function duelWeaponRange(f, W) { return (W.set === 'bow' ? 165 : T * 2) + min(18, f.duelRange || 0); }
+function duelAimPoint(f, W, x, y) {
+  const cx = f.x + 3, cy = f.y + 10, dx = x - cx, dy = y - cy, d = hypot(dx, dy), r = duelWeaponRange(f, W);
+  return d > r ? { x: cx + dx * r / d, y: cy + dy * r / d } : { x, y };
+}
 function startAttack(f, btn, I, force) {
   const W = heldOf(f); if (!W || W.type !== 'weapon') return false;
   const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode;

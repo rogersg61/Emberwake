@@ -151,6 +151,9 @@ function renderView(al) {
   cx = camX(cx); cy = camY(cy);
   const ox = round(cx * S), oy = round(cy * S); cx = ox / S; cy = oy / S; G.rcx = cx; G.rcy = cy;
   mouse.wx = cx + mouse.x / S; mouse.wy = cy + mouse.y / S;
+  if (WORLD.arena && !WORLD.royale && NET.duelMode && !NET.spectating && !p.dead) {
+    const aim = duelAimPoint(p, heldOf(p), mouse.wx, mouse.wy); mouse.wx = aim.x; mouse.wy = aim.y;
+  }
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
   drawSky(ctx, cx, cy);
   const ax0 = floor(cx), ay0 = floor(cy), offx = (ax0 - cx) * S, offy = (ay0 - cy) * S;
@@ -301,7 +304,7 @@ function renderView(al) {
     for (const e of G.enemies) if (!e.dead && !e.root && e.type !== 'boss' && !e.boss && e.hp < e.maxhp) { const x = round(lerp(e.px, e.x, al) + e.w / 2 - 6), y = round(lerp(e.py, e.y, al) - 5); ctx.fillStyle = INK; ctx.fillRect(x - 1, y - 1, 14, 3); ctx.fillStyle = '#e2483b'; ctx.fillRect(x, y, round(12 * max(0, e.hp) / e.maxhp), 1); }
     drawFlowTags(ctx);
     for (const n of G.nums) { ctx.globalAlpha = min(1, n.life / 12); const tw2 = textW(n.text, n.sc); textO(ctx, n.text, round((n.x - tw2 / 2) * S) / S, round(n.y * S) / S, n.col, n.sc); } ctx.globalAlpha = 1;
-    drawAim(ctx, S);
+    drawDuelAim(ctx, S); drawAim(ctx, S);
   }
   // ---------- screen space ----------
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(vig, 0, 0, W, H); dimOverlay(ctx, W, H, cx, cy); if (WORLD.royale && G.state === 'play') brScreen(ctx, W, H);
@@ -316,6 +319,17 @@ function renderView(al) {
   ctx.setTransform(VS.ui, 0, 0, VS.ui, 0, 0); mouse.ux = mouse.x / VS.ui; mouse.uy = mouse.y / VS.ui;
   if (G.state === 'play') drawTags(ctx, cx, cy, al);
   drawUI(ctx);
+}
+function drawDuelAim(c, S) {
+  const p = G.p;
+  if (!WORLD.arena || WORLD.royale || !NET.duelMode || NET.spectating || p.dead || UI.open) return;
+  const r = duelWeaponRange(p, heldOf(p)), x = mouse.wx, y = mouse.wy, arm = 4 / S, gap = 1.5 / S;
+  c.save(); c.globalAlpha = .65; c.strokeStyle = '#8ff5e6'; c.lineWidth = 1 / S;
+  c.setLineDash([3 / S, 3 / S]); c.beginPath(); c.arc(p.x + 3, p.y + 10, r, 0, TAU); c.stroke();
+  c.setLineDash([]); c.globalAlpha = .95; c.strokeStyle = '#fff1a8'; c.beginPath();
+  c.moveTo(x - arm, y); c.lineTo(x - gap, y); c.moveTo(x + gap, y); c.lineTo(x + arm, y);
+  c.moveTo(x, y - arm); c.lineTo(x, y - gap); c.moveTo(x, y + gap); c.lineTo(x, y + arm); c.stroke();
+  c.fillStyle = '#ffffff'; c.fillRect(x - .5 / S, y - .5 / S, 1 / S, 1 / S); c.restore();
 }
 function drawStates(c, al) {
   const ent = [...G.fighters, ...G.enemies];
@@ -514,7 +528,15 @@ function quitToTitle() {
   WORLD.id = ''; sfx('ui');
 }
 // ---------------- input ----------------
-function setMouse(e) { const r = cv.getBoundingClientRect(); mouse.x = (e.clientX - r.left) * (cv.width / r.width); mouse.y = (e.clientY - r.top) * (cv.height / r.height); mouse.ux = mouse.x / VS.ui; mouse.uy = mouse.y / VS.ui; }
+function setMouse(e) {
+  const r = cv.getBoundingClientRect(); mouse.x = (e.clientX - r.left) * (cv.width / r.width); mouse.y = (e.clientY - r.top) * (cv.height / r.height); mouse.ux = mouse.x / VS.ui; mouse.uy = mouse.y / VS.ui;
+  if (isFinite(G.rcx) && isFinite(G.rcy) && VS.s > 0) {
+    mouse.wx = G.rcx + mouse.x / VS.s; mouse.wy = G.rcy + mouse.y / VS.s;
+    if (WORLD.arena && !WORLD.royale && NET.duelMode && !NET.spectating && G.p && !G.p.dead) {
+      const aim = duelAimPoint(G.p, heldOf(G.p), mouse.wx, mouse.wy); mouse.wx = aim.x; mouse.wy = aim.y;
+    }
+  }
+}
 addEventListener('keydown', e => {
   const k = e.code;
   if (UI.focus && G.state !== 'play') {
