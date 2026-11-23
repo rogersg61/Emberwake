@@ -305,6 +305,10 @@ function startAttack(f, btn, I, force) {
   f.face = c.side; f.state = 'attack'; f.chainT = 0; f.mineP = 0;
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
+  if (f.isPlayer) {
+    f.beatStance = f.lastBeatBtn && f.lastBeatBtn !== btn ? 'FLOW' : f.lastBeatBtn === btn ? 'STRAIN' : 'OPEN';
+    f.beatStanceT = 180;
+  }
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
   if (f.isPlayer) {
     const paceBase = max(10, round((m.wind + m.act + m.rec) * (m.big ? .24 : .18)));
@@ -570,10 +574,23 @@ function advancePhraseBranch(f, setName, btn) {
 function combatTempoHit(f, a, e) {
   if (!f.isPlayer || f.snapped > 0) return;
   const timing = a.timing || 'normal';
+  const previousBeat = f.lastBeatBtn || '';
+  f.lastBeatBtn = a.btn;
   if (f.repeatMove === a.id && f.tempoT > 0) f.repeatCount = min(5, (f.repeatCount || 0) + 1);
   else { f.repeatMove = a.id; f.repeatCount = 1; }
   f.tempoT = 150;
   const branch = advancePhraseBranch(f, a.setName, a.btn);
+  if (previousBeat && previousBeat !== a.btn) {
+    f.fray = max(0, f.fray - 7);
+    f.dissonance = max(0, f.dissonance - 7);
+    f.beatStance = 'FLOW';
+    f.beatStanceT = 180;
+  } else if (previousBeat === a.btn) {
+    f.fray = min(100, f.fray + 10);
+    f.dissonance = min(100, f.dissonance + 6);
+    f.beatStance = 'STRAIN';
+    f.beatStanceT = 180;
+  }
   if (branch.complete) {
     const phrase = branch.complete;
     f.cadencePhrase = (f.cadencePhrase || 0) + 1;

@@ -5811,6 +5811,10 @@ function startAttack(f, btn, I, force) {
   f.face = c.side; f.state = 'attack'; f.chainT = 0; f.mineP = 0;
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
+  if (f.isPlayer) {
+    f.beatStance = f.lastBeatBtn && f.lastBeatBtn !== btn ? 'FLOW' : f.lastBeatBtn === btn ? 'STRAIN' : 'OPEN';
+    f.beatStanceT = 180;
+  }
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
   if (f.isPlayer) {
     const paceBase = max(10, round((m.wind + m.act + m.rec) * (m.big ? .24 : .18)));
@@ -6076,10 +6080,23 @@ function advancePhraseBranch(f, setName, btn) {
 function combatTempoHit(f, a, e) {
   if (!f.isPlayer || f.snapped > 0) return;
   const timing = a.timing || 'normal';
+  const previousBeat = f.lastBeatBtn || '';
+  f.lastBeatBtn = a.btn;
   if (f.repeatMove === a.id && f.tempoT > 0) f.repeatCount = min(5, (f.repeatCount || 0) + 1);
   else { f.repeatMove = a.id; f.repeatCount = 1; }
   f.tempoT = 150;
   const branch = advancePhraseBranch(f, a.setName, a.btn);
+  if (previousBeat && previousBeat !== a.btn) {
+    f.fray = max(0, f.fray - 7);
+    f.dissonance = max(0, f.dissonance - 7);
+    f.beatStance = 'FLOW';
+    f.beatStanceT = 180;
+  } else if (previousBeat === a.btn) {
+    f.fray = min(100, f.fray + 10);
+    f.dissonance = min(100, f.dissonance + 6);
+    f.beatStance = 'STRAIN';
+    f.beatStanceT = 180;
+  }
   if (branch.complete) {
     const phrase = branch.complete;
     f.cadencePhrase = (f.cadencePhrase || 0) + 1;
@@ -7088,7 +7105,8 @@ function newFighter(x, y, o) {
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
     tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
     cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
-    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0
+    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0,
+    beatStance: 'OPEN', beatStanceT: 0, pressure: 0, lastBeatBtn: '', cadenceSet: ''
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -7161,6 +7179,8 @@ function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
   if (f.paceLock > 0) f.paceLock--;
   if (f.paceDebt > 0) f.paceDebt = max(0, f.paceDebt - .35);
+  if (f.beatStanceT > 0) f.beatStanceT--;
+  else f.beatStance = 'OPEN';
   if (f.paceRepeatT > 0) f.paceRepeatT--;
   else if (f.paceRepeatN > 0) { f.paceRepeatN = 0; f.paceRepeat = ''; }
   if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
@@ -7169,6 +7189,7 @@ function tickFighter(f, I) {
   if (f.tempoT <= 0) f.tempo = max(0, (f.tempo || 0) - .12);
   f.fray = max(0, (f.fray || 0) - (f.snapped > 0 ? .12 : .38));
   f.dissonance = max(0, (f.dissonance || 0) - (f.snapped > 0 ? .08 : .28));
+  f.pressure = clamp(max(f.fray || 0, f.dissonance || 0, f.paceDebt || 0), 0, 100);
   if (f.cadenceT > 0) f.cadenceT--;
   else if (f.cadenceStep > 0) {
     f.cadenceStep = 0;
@@ -7300,6 +7321,15 @@ function playerInput() {
 }
 function tickPlayer() {
   const p = G.p, I = playerInput();
+  const held = heldOf(p);
+  if (held && held.type === 'weapon') {
+    if (p.cadenceSet && p.cadenceSet !== held.set) {
+      p.cadenceIndex = 0; p.cadenceStep = 0; p.cadenceSeq = ''; p.cadenceT = 0;
+    }
+    p.cadenceSet = held.set;
+  } else if (p.cadenceSet) {
+    p.cadenceSet = ''; p.cadenceIndex = 0; p.cadenceStep = 0; p.cadenceSeq = ''; p.cadenceT = 0;
+  }
   if (WORLD.royale && !brInput(p, I)) return;
   tickFighter(p, I);
   if (WORLD.royale) brAfter(p, I);
@@ -9273,7 +9303,7 @@ function button(c, x, y, w, h, label, fn, o = {}) {
   const hv = !o.off && inR(x, y, w, h), on = o.on;
   c.fillStyle = o.off ? '#2b2740' : hv || on ? '#ffd35a' : '#4a4460'; c.fillRect(x, y, w, h);
   c.fillStyle = hv ? '#3a3350' : on ? '#3d3320' : '#262234'; c.fillRect(x + 1, y + 1, w - 2, h - 2);
-  textC(c, label, x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
+  textC(c, fitText(label, w - 8), x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
   if (!o.off) hit(x, y, w, h, fn);
 }
 function field(c, x, y, w, key, ph) {
@@ -9379,7 +9409,7 @@ function itemTip(it) {
 function drawTempoHud(c) {
   const p = G.p;
   if (!p) return;
-  const tempo = clamp(p.tempo || 0, 0, 100), fray = clamp(p.fray || 0, 0, 100), snapped = (p.snapped || 0) > 0;
+  const tempo = clamp(p.tempo || 0, 0, 100), pressure = clamp(p.pressure || 0, 0, 100), snapped = (p.snapped || 0) > 0;
   const tier = tempo >= 100 ? 3 : tempo >= 65 ? 2 : tempo >= 35 ? 1 : 0;
   const name = snapped ? 'SNAPPED' : tier === 3 ? 'TEMPO : ASHEN' : tier === 2 ? 'TEMPO : KINDLED' : tier === 1 ? 'TEMPO : PULSE' : 'TEMPO';
   const col = snapped ? '#e2483b' : tier >= 2 ? '#ffd35a' : tier === 1 ? '#8ff5e6' : '#b9bdd0';
@@ -9387,7 +9417,7 @@ function drawTempoHud(c) {
   c.fillStyle = '#2b2740'; c.fillRect(15, 46, 72, 3);
   c.fillStyle = snapped ? '#e2483b' : col; c.fillRect(15, 46, round(72 * tempo / 100), 3);
   c.fillStyle = '#2b2740'; c.fillRect(15, 51, 72, 2);
-  c.fillStyle = fray >= 70 ? '#ff6b6b' : fray >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * max(fray, p.dissonance || 0) / 100), 2);
+  c.fillStyle = pressure >= 70 ? '#ff6b6b' : pressure >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * pressure / 100), 2);
   const W = heldItem();
   if (W && W.type === 'weapon') {
     const phrases = COMBAT_PHRASES[W.set] || COMBAT_PHRASES.sword;
@@ -9396,9 +9426,10 @@ function drawTempoHud(c) {
     const branches = phrases.filter(q => q.pattern.join('').startsWith(seq));
     const next = [];
     for (const q of branches) { const b = q.pattern[seq.length]; if (b && !next.includes(b)) next.push(b); }
-    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  BRANCH`;
+    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  ${phrase.effect.toUpperCase()}`;
     if (next.length) line += '  NEXT ' + next.join('/');
-    textS(c, fitText(line.trim(), 180), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+    textS(c, fitText(line.trim(), 180), 15, 56, pressure > 55 ? '#ff6b6b' : '#8b8fa3');
+    textS(c, p.beatStance || 'OPEN', 91, 37, p.beatStance === 'FLOW' ? '#8ff5e6' : p.beatStance === 'STRAIN' ? '#ffb347' : '#b9bdd0');
     if (p.paceLock > 0) textS(c, 'COMMIT', 91, 56, '#ffb347');
   }
   if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
@@ -9414,8 +9445,13 @@ function drawLogo(c, cy, sub) {
 }
 function drawTitle(c) {
   const uw = VS.uw, uh = VS.uh; c.fillStyle = 'rgba(18,13,31,.38)'; c.fillRect(0, 0, uw, uh);
-  drawLogo(c, round(uh * .14), 'BUILD. EXPLORE. FIGHT.');
-  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .31), gap = 18, bh = 20;
+  const logoSc = uw > 520 ? 5 : uw > 380 ? 4 : 3;
+  const logoY = max(8, round(uh * .12));
+  drawLogo(c, logoY, 'BUILD. EXPLORE. FIGHT.');
+  const bw = min(176, uw - 32), bx = round((uw - bw) / 2);
+  const gap = 18, bh = 20;
+  let by = max(round(uh * .31), logoY + logoSc * 8 + 24);
+  if (by + gap * 6 + bh > uh - 36) by = max(8, uh - 36 - (gap * 6 + bh));
   button(c, bx, by, bw, bh, 'SINGLEPLAYER', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
   button(c, bx, by + gap, bw, bh, 'MULTIPLAYER', () => { G.state = 'multiplayer'; UI.focus = null; sfx('ui'); });
   button(c, bx, by + gap * 3, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
@@ -13406,7 +13442,9 @@ function genVeil(seed) { const w = 90, h = 6; const [c, x] = mk(w, h); const R =
 function resize() {
   const W = max(320, innerWidth), H = max(240, innerHeight); cv.width = W; cv.height = H;
   // the world is drawn at a whole-pixel scale that shows about 40 to 55 tiles from top to bottom; menus keep their own size
-  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s; VS.ui = clamp(round(H / 250), 2, 6) >= 4 ? 3 : 2; VS.uw = W / VS.ui; VS.uh = H / VS.ui;
+  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s;
+  VS.ui = W >= 900 && H >= 650 ? 3 : 2;
+  VS.uw = W / VS.ui; VS.uh = H / VS.ui;
   ctx.imageSmoothingEnabled = false;
   const bw = ceil(VS.vw) + 2, bh = ceil(VS.vh) + 2;[acv, actx] = mk(bw, bh);[lcv, lctx] = mk(bw, bh);[fcv, fctx] = mk(bw, bh);[gcv, gctx] = mk(bw, bh);[glcv, glctx] = mk(bw, bh); wctx = ctx;
   const mkV = (r, g, b, k) => { const [c, vx] = mk(64, 36); const d = vx.createImageData(64, 36); for (let Y = 0; Y < 36; Y++) for (let X = 0; X < 64; X++) { const q = hypot((X - 31.5) / 32, (Y - 17.5) / 18), i = (Y * 64 + X) * 4; d.data[i] = r; d.data[i + 1] = g; d.data[i + 2] = b; d.data[i + 3] = 255 * clamp((q - .62) * k, 0, 1); } vx.putImageData(d, 0, 0); return c; };

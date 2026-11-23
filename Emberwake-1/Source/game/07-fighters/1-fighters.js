@@ -24,7 +24,8 @@ function newFighter(x, y, o) {
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
     tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
     cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
-    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0
+    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0,
+    beatStance: 'OPEN', beatStanceT: 0, pressure: 0, lastBeatBtn: '', cadenceSet: ''
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -97,6 +98,8 @@ function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
   if (f.paceLock > 0) f.paceLock--;
   if (f.paceDebt > 0) f.paceDebt = max(0, f.paceDebt - .35);
+  if (f.beatStanceT > 0) f.beatStanceT--;
+  else f.beatStance = 'OPEN';
   if (f.paceRepeatT > 0) f.paceRepeatT--;
   else if (f.paceRepeatN > 0) { f.paceRepeatN = 0; f.paceRepeat = ''; }
   if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
@@ -105,6 +108,7 @@ function tickFighter(f, I) {
   if (f.tempoT <= 0) f.tempo = max(0, (f.tempo || 0) - .12);
   f.fray = max(0, (f.fray || 0) - (f.snapped > 0 ? .12 : .38));
   f.dissonance = max(0, (f.dissonance || 0) - (f.snapped > 0 ? .08 : .28));
+  f.pressure = clamp(max(f.fray || 0, f.dissonance || 0, f.paceDebt || 0), 0, 100);
   if (f.cadenceT > 0) f.cadenceT--;
   else if (f.cadenceStep > 0) {
     f.cadenceStep = 0;
@@ -236,6 +240,15 @@ function playerInput() {
 }
 function tickPlayer() {
   const p = G.p, I = playerInput();
+  const held = heldOf(p);
+  if (held && held.type === 'weapon') {
+    if (p.cadenceSet && p.cadenceSet !== held.set) {
+      p.cadenceIndex = 0; p.cadenceStep = 0; p.cadenceSeq = ''; p.cadenceT = 0;
+    }
+    p.cadenceSet = held.set;
+  } else if (p.cadenceSet) {
+    p.cadenceSet = ''; p.cadenceIndex = 0; p.cadenceStep = 0; p.cadenceSeq = ''; p.cadenceT = 0;
+  }
   if (WORLD.royale && !brInput(p, I)) return;
   tickFighter(p, I);
   if (WORLD.royale) brAfter(p, I);

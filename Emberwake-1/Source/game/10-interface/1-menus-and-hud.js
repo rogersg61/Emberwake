@@ -17,7 +17,7 @@ function button(c, x, y, w, h, label, fn, o = {}) {
   const hv = !o.off && inR(x, y, w, h), on = o.on;
   c.fillStyle = o.off ? '#2b2740' : hv || on ? '#ffd35a' : '#4a4460'; c.fillRect(x, y, w, h);
   c.fillStyle = hv ? '#3a3350' : on ? '#3d3320' : '#262234'; c.fillRect(x + 1, y + 1, w - 2, h - 2);
-  textC(c, label, x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
+  textC(c, fitText(label, w - 8), x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
   if (!o.off) hit(x, y, w, h, fn);
 }
 function field(c, x, y, w, key, ph) {
@@ -123,7 +123,7 @@ function itemTip(it) {
 function drawTempoHud(c) {
   const p = G.p;
   if (!p) return;
-  const tempo = clamp(p.tempo || 0, 0, 100), fray = clamp(p.fray || 0, 0, 100), snapped = (p.snapped || 0) > 0;
+  const tempo = clamp(p.tempo || 0, 0, 100), pressure = clamp(p.pressure || 0, 0, 100), snapped = (p.snapped || 0) > 0;
   const tier = tempo >= 100 ? 3 : tempo >= 65 ? 2 : tempo >= 35 ? 1 : 0;
   const name = snapped ? 'SNAPPED' : tier === 3 ? 'TEMPO : ASHEN' : tier === 2 ? 'TEMPO : KINDLED' : tier === 1 ? 'TEMPO : PULSE' : 'TEMPO';
   const col = snapped ? '#e2483b' : tier >= 2 ? '#ffd35a' : tier === 1 ? '#8ff5e6' : '#b9bdd0';
@@ -131,7 +131,7 @@ function drawTempoHud(c) {
   c.fillStyle = '#2b2740'; c.fillRect(15, 46, 72, 3);
   c.fillStyle = snapped ? '#e2483b' : col; c.fillRect(15, 46, round(72 * tempo / 100), 3);
   c.fillStyle = '#2b2740'; c.fillRect(15, 51, 72, 2);
-  c.fillStyle = fray >= 70 ? '#ff6b6b' : fray >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * max(fray, p.dissonance || 0) / 100), 2);
+  c.fillStyle = pressure >= 70 ? '#ff6b6b' : pressure >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * pressure / 100), 2);
   const W = heldItem();
   if (W && W.type === 'weapon') {
     const phrases = COMBAT_PHRASES[W.set] || COMBAT_PHRASES.sword;
@@ -140,9 +140,10 @@ function drawTempoHud(c) {
     const branches = phrases.filter(q => q.pattern.join('').startsWith(seq));
     const next = [];
     for (const q of branches) { const b = q.pattern[seq.length]; if (b && !next.includes(b)) next.push(b); }
-    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  BRANCH`;
+    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  ${phrase.effect.toUpperCase()}`;
     if (next.length) line += '  NEXT ' + next.join('/');
-    textS(c, fitText(line.trim(), 180), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+    textS(c, fitText(line.trim(), 180), 15, 56, pressure > 55 ? '#ff6b6b' : '#8b8fa3');
+    textS(c, p.beatStance || 'OPEN', 91, 37, p.beatStance === 'FLOW' ? '#8ff5e6' : p.beatStance === 'STRAIN' ? '#ffb347' : '#b9bdd0');
     if (p.paceLock > 0) textS(c, 'COMMIT', 91, 56, '#ffb347');
   }
   if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
@@ -158,8 +159,13 @@ function drawLogo(c, cy, sub) {
 }
 function drawTitle(c) {
   const uw = VS.uw, uh = VS.uh; c.fillStyle = 'rgba(18,13,31,.38)'; c.fillRect(0, 0, uw, uh);
-  drawLogo(c, round(uh * .14), 'BUILD. EXPLORE. FIGHT.');
-  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .31), gap = 18, bh = 20;
+  const logoSc = uw > 520 ? 5 : uw > 380 ? 4 : 3;
+  const logoY = max(8, round(uh * .12));
+  drawLogo(c, logoY, 'BUILD. EXPLORE. FIGHT.');
+  const bw = min(176, uw - 32), bx = round((uw - bw) / 2);
+  const gap = 18, bh = 20;
+  let by = max(round(uh * .31), logoY + logoSc * 8 + 24);
+  if (by + gap * 6 + bh > uh - 36) by = max(8, uh - 36 - (gap * 6 + bh));
   button(c, bx, by, bw, bh, 'SINGLEPLAYER', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
   button(c, bx, by + gap, bw, bh, 'MULTIPLAYER', () => { G.state = 'multiplayer'; UI.focus = null; sfx('ui'); });
   button(c, bx, by + gap * 3, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
