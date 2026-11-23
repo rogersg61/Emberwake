@@ -5775,7 +5775,7 @@ function noteMove(f, setName, id, m, fresh) {
 for (const [name, set] of Object.entries(MOVESETS)) {
   set.moves.duel_strike = mv('Strike', 'L', 'LMB', {
     kind: name === 'bow' ? 'shot' : 'thrust', wind: 3, act: 4, rec: 12, dmg: 1,
-    kb: [.6, -.25], reach: 1, lo: -18, hi: 18,
+    kb: [2.4, -1.2], reach: 1, lo: -18, hi: 18, stop: 5, stagger: 1,
     arrows: name === 'bow' ? { n: 1, v: 7, g: .01 } : undefined
   });
 }
@@ -5800,7 +5800,7 @@ function startAttack(f, btn, I, force) {
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
-  if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 20; }
+  if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 14; }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
   const timingMul = timing === 'perfect' ? 1.28 : timing === 'rushed' ? .72 : timing === 'steady' ? 1.1 : 1;
@@ -5952,9 +5952,9 @@ function hitFx(hx, hy, top, dmg, o, kx, involved) {
 function strike(by, e, dmg, kx, ky, o) {
   if (!e.fighter) { const r = damageEnemy(e, dmg, kx, ky, o) > 0; if (r && o.launch && !e.dead && !o.link) applyStatus(e, 'launched', by); return r; }
   const hx = o.hx === undefined ? e.x + 3 : o.hx, hy = o.hy === undefined ? e.y + 10 : o.hy;
-  if (e.remote) { if (e.dead || e.spawnT > 0 || e.noHit) return false; netHit(e, dmg, kx, ky, o.crit, 0, by); e.flash = 6; hitFx(hx, hy, e.y, max(1, round(dmg * .8)), o, kx, by === G.p); if (WORLD.arena && !WORLD.royale && NET.duelMode && by) by.duelRange = min(18, (by.duelRange || 0) + 2.5); return true; }
+  if (e.remote) { if (e.dead || e.spawnT > 0 || e.noHit) return false; netHit(e, dmg, kx, ky, o.crit, 0, by); e.flash = 6; hitFx(hx, hy, e.y, max(1, round(dmg * .8)), o, kx, by === G.p); if (WORLD.arena && !WORLD.royale && NET.duelMode && by) by.duelRange = min(18, (by.duelRange || 0) + 5); return true; }
   const r = hurtFighter(e, dmg, by ? by.x + 3 : hx - kx, { kx, ky, by, pvp: !!(by && by.fighter), stop: o.stop, shake: o.shake, crit: o.crit, stagger: o.stagger, blunt: o.blunt, launch: o.launch, cold: o.cold, hx, hy, link: o.link });
-  if (r && WORLD.arena && !WORLD.royale && NET.duelMode && by) by.duelRange = min(18, (by.duelRange || 0) + 2.5);
+  if (r && WORLD.arena && !WORLD.royale && NET.duelMode && by) by.duelRange = min(18, (by.duelRange || 0) + 5);
   if (r && o.launch && !e.dead && !o.link) applyStatus(e, 'launched', by); return r;
 }
 function applyHit(a, e, hx, hy) {
@@ -5969,7 +5969,7 @@ function applyHit(a, e, hx, hy) {
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face, ky = m.kb[1];
   if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
-  if (duel) { kx = sprint ? 5.2 * a.face : .6 * a.face; ky = sprint ? -1.8 : -.25; }
+  if (duel) { kx = sprint ? 5.2 * a.face : 2.4 * a.face; ky = sprint ? -1.8 : -1.2; }
   if (!strike(f, e, dmg, kx, ky, { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });

@@ -47,24 +47,33 @@ async def main():
           const startingRange = duelWeaponRange(p, IT.sword), clamped = duelAimPoint(p, IT.sword, p.x + 1000, p.y + 10);
           const aimRange = Math.hypot(clamped.x - (p.x + 3), clamped.y - (p.y + 10));
           startAttack(p, 'H', input);
-          const simple = p.atk.id === 'duel_strike' && p.atk.m.kind === 'thrust' && p.duelCooldown > 0;
+          const simple = p.atk.id === 'duel_strike' && p.atk.m.kind === 'thrust', attackCooldown = p.duelCooldown;
           p.state = 'normal'; p.atk = null; p.duelCooldown = 15;
           tickFighter(p, { md: 0, jumpP: false, jumpH: false, down: false, l: true, r: false, lp: true, rp: false, dodgeP: false, wx: p.x + 30, wy: p.y + 7, armP: false });
           const cooldown = !p.atk;
           e.spawnT = 0; e.dead = false; p.duelRange = 0; strike(p, e, 2, 1, -1, {});
-          const grew = p.duelRange > 0;
-          p.inv = 0; hurtFighter(p, 1, e.x, { pvp: true, by: e, kx: 0, ky: 0 });
-          const reset = p.duelRange === 0;
+          const firstHitRange = p.duelRange;
+          for (let i = 0; i < 5; i++) strike(p, e, 2, 1, -1, {});
+          const maxRange = p.duelRange;
+          p.inv = 20; const blocked = !hurtFighter(p, 1, e.x, { pvp: true, by: e, kx: 0, ky: 0 });
+          const blockedRange = p.duelRange;
+          p.inv = 0; hurtFighter(p, 1, e.x, { pvp: true, by: e, kx: 2.4, ky: -1.2, stagger: 1 });
+          const reset = p.duelRange === 0, knockback = p.vx, hitstun = p.hurtT;
           const a = { f: p, id: 'duel_strike', m: { dmg: 1, kb: [.6, -.25], kind: 'thrust', btn: 'L' }, W: IT.sword, set: MOVESETS.sword, stale: 1, gm: 1, btn: 'L', hits: new Map(), fresh: true, hit: false, crit: true, setName: 'sword', pt: 1, aimA: 0, face: 1 };
           const random = Math.random; Math.random = () => .5;
           try {
-            p.onGround = true; p.vy = 0; applyHit(a, e, e.x, e.y); const ground = NET.hits.at(-1)[2];
-            a.pt = 20; a.hits.clear(); p.onGround = false; p.vy = 3; applyHit(a, e, e.x, e.y);
-            return { simple, cooldown, grew, reset, startingRange, aimRange, fallingRatio: NET.hits.at(-1)[2] / ground };
+            p.onGround = true; p.vx = 0; p.vy = 0; applyHit(a, e, e.x, e.y);
+            const ground = NET.hits.at(-1)[2], groundKb = NET.hits.at(-1)[3];
+            a.pt = 20; a.hits.clear(); p.onGround = false; p.vx = 2; p.vy = 3; applyHit(a, e, e.x, e.y);
+            return { simple, attackCooldown, cooldown, firstHitRange, maxRange, blocked, blockedRange, reset, knockback, hitstun, startingRange, aimRange, groundKb, sprintKb: NET.hits.at(-1)[3], fallingRatio: NET.hits.at(-1)[2] / ground };
           } finally { Math.random = random; }
         })()""")
-        assert combat['simple'] and combat['cooldown'] and combat['grew'] and combat['reset'], combat
+        assert combat['simple'] and combat['attackCooldown'] == 14 and combat['cooldown'], combat
+        assert combat['firstHitRange'] == 5 and combat['maxRange'] == 18, combat
+        assert combat['blocked'] and combat['blockedRange'] == 18 and combat['reset'], combat
+        assert combat['knockback'] >= 2 and combat['hitstun'] == 24, combat
         assert combat['startingRange'] == 2 * 8 and abs(combat['aimRange'] - combat['startingRange']) < .01, combat
+        assert combat['groundKb'] == 2.4 and combat['sprintKb'] == 5.2, combat
         assert 1.15 <= combat['fallingRatio'] <= 1.35, combat
 
         third = await page('CHARLIE')
