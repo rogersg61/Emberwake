@@ -2606,7 +2606,6 @@ function tickDims() {
   const p = G.p, F = G.flags; if (!p) return;
   if (F.gateOpen && !F.dim1) F.dim1 = true;
   const mh = 100 + bonusHP(); if (p.maxhp !== mh) { p.maxhp = mh; if (p.hp > mh) p.hp = mh; }
-  if (gearHas('regrowth') && !p.dead && p.hp < p.maxhp && p.regenT > 150 && G.time % 24 === 0) p.hp++;
   if (DIM === 3) {
     if (p.onGround && !p.dead && solidAt(floor((p.x + 3) / T), floor((p.y + p.h + 2) / T))) G.lastSafe = { x: p.x, y: p.y };
     if (p.y > (WH - 34) * T && !p.dead) {
@@ -4098,8 +4097,6 @@ function tickMeal() {
   if (G.meal && G.meal.t > 0 && --G.meal.t <= 0) { say('The meal wears off.'); G.meal = null; }
   if (G.rest > 0) G.rest--;
   if (!p.dead && p.hp < p.maxhp && G.state === 'play') {
-    if (boonHas('regen2') && G.time % 50 === 0) p.hp = min(p.maxhp, p.hp + 1);
-    else if (boonHas('regen') && p.regenT > 300 && G.time % 80 === 0) p.hp = min(p.maxhp, p.hp + 1);
   }
 }
 function drawMealHud(c) {
@@ -5416,7 +5413,6 @@ function furnFoes(cx, cy, r) { const out = []; for (const e of G.enemies) if (!e
 function tickFurniture() {
   const p = G.p; if (!p) return; const host = !netGuest(); oreSeekerFx();
   if (G.time % 20 === 0) { const ptx = floor((p.x + 3) / T), pty = floor((p.y + 10) / T); G.nearWarm = !!furnNear(ptx, pty, [BRAZIER], 5, 4); G.nearFount = !!furnNear(ptx, pty, [FOUNTAIN], 3, 3); }
-  if (G.nearFount && !p.dead && p.hp < p.maxhp && p.regenT > 120 && G.time % 40 === 0) { p.hp = min(p.maxhp, p.hp + 1); if (G.time % 120 === 0) P(p.x + 3, p.y + 4, 0, -.5, 30, '#8fd0d8', { glow: 1, g: -.01 }); }
   for (const [i, s] of STN) {
     const t = s.t; if (!FURN_IDS.has(t) || tiles[i] !== t) continue; const tx = i % WW, ty = (i / WW) | 0, cx = tx * T + 4, cy = ty * T + 4;
     if (t === PLANTER) { if (s.crop && CROPS[s.crop]) { const C = CROPS[s.crop], sun = G.sun > .45 && ty < SKYL[tx] && !walls[i]; s.grow += C.dark ? (sun ? .6 : 1.2) : (sun ? 1.4 : .8); } continue; }
@@ -5786,6 +5782,11 @@ function startAttack(f, btn, I, force) {
   if (!duel && !force && tryLink(f, btn)) return true;
   const set = MOVESETS[W.set], c = atkContext(f, I); let id = duel ? 'duel_strike' : force || resolveMove(set, btn, c); if (!duel && !force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
+  if (f.isPlayer) {
+    f.comboSeq = ((f.comboSeq || '') + btn).slice(-4);
+    f.comboT = 150;
+    f.comboN = min(6, (f.comboN || 0) + 1);
+  }
   if (duel) m = Object.assign({}, m, { reach: duelWeaponRange(f, W) / max(1, ARM + W.len) });
   if (force) { if (m.cost) { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
   else if (m.rise && c.air) { if (!f.updraft) { id = btn === 'L' ? set.map.aChain[0] : set.map.ha; m = set.moves[id]; } else f.updraft = false; }
@@ -5796,11 +5797,13 @@ function startAttack(f, btn, I, force) {
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
+  if (f.isPlayer && f.comboN > 1) {
+    a.tm = (a.tm || 1) * max(.72, 1 - (f.comboN - 1) * .055);
+    a.act = max(3, round(a.act * .82));
+  }
   if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 20; }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
-  const timingMul = timing === 'perfect' ? 1.28 : timing === 'rushed' ? .72 : timing === 'steady' ? 1.1 : 1;
-  a.gm = (a.gm || 1) * timingMul;
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -5938,6 +5941,17 @@ function reflectProj(pr, a) {
   fsx(a.f, 'reflect'); sparks(pr.x, pr.y, 10); numPop(pr.x, pr.y - 6, 'DEFLECT', '#8ff5e6'); if (a.f === G.p) { G.hitstop = max(G.hitstop, 3); comboHit(true); }
 }
 function comboHit(fresh) { const c = G.combo; c.n++; c.t = 180; c.pts += fresh ? 3 : 1; }
+function comboResolve(f, a) {
+  if (!f.isPlayer || !f.comboSeq) return null;
+  const s = f.comboSeq;
+  if (s.endsWith('LLL')) return { name: 'TRIPLE EDGE', mul: 1.38, flow: 'open', launch: 0 };
+  if (s.endsWith('LLH')) return { name: 'CROSS BREAK', mul: 1.5, flow: 'down', launch: 1 };
+  if (s.endsWith('LHH')) return { name: 'HEAVY RECOIL', mul: 1.42, flow: 'open', launch: 0 };
+  if (s.endsWith('HLL')) return { name: 'REBOUND', mul: 1.32, flow: 'open', launch: 0 };
+  if (s.endsWith('HHH')) return { name: 'WORLD CRUSH', mul: 1.65, flow: 'down', launch: 0 };
+  if (s.endsWith('HLH')) return { name: 'TURNING GALE', mul: 1.48, flow: 'open', launch: 1 };
+  return null;
+}
 function hitFx(hx, hy, top, dmg, o, kx, involved) {
   numPop(hx, top - 4, dmg, o.crit ? '#ffd35a' : '#ffffff', o.crit ? 2 : 1); sparks(hx, hy, o.crit ? 12 : 6, sign(kx), 2.4, o.cold ? FROST : SPARK); if (o.blunt) dust(hx, hy, 4);
   G.trails.push({ kind: 'hit', x: hx, y: hy, life: 5, max: 5, a: frand(TAU), big: o.crit || o.stop >= 5 });
@@ -5956,13 +5970,20 @@ function applyHit(a, e, hx, hy) {
   const f = a.f, m = a.m, root = e.root || e, last = a.hits.get(root);
   if (last !== undefined && (!m.multi || a.pt - last < m.multi)) return; a.hits.set(root, a.pt);
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
-  const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
-  const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
-  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
+  const crit = a.crit || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
+  const chain = P0 ? comboResolve(f, a) : null;
+  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (chain ? chain.mul : 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
   const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
-  if (!strike(f, e, dmg, kx, m.kb[1], { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  const launch = chain && chain.launch ? 1 : m.launch;
+  if (!strike(f, e, dmg, kx, chain && chain.flow === 'down' ? -3.4 : m.kb[1], { stagger: chain && chain.flow === 'down' ? max(m.stagger || 0, 55) : m.stagger, launch, crit, stop: (m.stop || 0) + (chain ? 3 : 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+  if (P0 && chain) {
+    f.comboTag = chain.name; f.comboTagT = 90;
+    numPop(hx, hy - 12, chain.name, '#ffd35a', .9);
+    sparks(hx, hy, 12, a.face, 2.4, ['#ffd35a', '#fff1a8', '#8ff5e6']);
+    f.comboSeq = '';
+  }
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }
@@ -6899,6 +6920,7 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
+    comboSeq: '', comboT: 0, comboN: 0, comboTag: '', comboTagT: 0,
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal'
   };
   Object.assign(f, o);
@@ -6933,7 +6955,6 @@ function hurtFighter(f, dmg, fromX, o = {}) {
   if (f.iDodge > 0 && !o.link) { if (!f.perfected && (f.state === 'dodge' || f.dodgeGrace > 0)) perfectDodge(f); return false; }
   if (f.inv > (o.net ? 30 : o.link ? 999 : 0)) return false;
   if (f.state === 'link' && !o.link) return false;
-  if (o.pvp && WORLD.arena && NET.duelMode) f.duelRange = 0;
   const pvp = !!o.pvp, armored = f.atk && f.atk.m.armor && f.atk.phase < 2;
   const gp = f === G.p && gearOn(); if (gp) { dmg = gearDamage(dmg, o); if ((gearHas('kindled') || gearHas('molten')) && o.by && o.by !== f && !o.by.dead && o.by.hp !== undefined && !o.by.fighter) applyStatus(o.by, 'burn', f, { d: 90 }); }
   dmg = max(1, round(dmg * (pvp && WORLD.arena ? .8 : 1) * (armored ? .65 : 1) * (f.dmgTaken || 1) * (f === G.p && !WORLD.arena && !o.net ? DIFF().taken * blessTaken() : 1)));
@@ -6971,9 +6992,11 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.comboT > 0) f.comboT--; else { f.comboSeq = ''; f.comboN = 0; }
+  if (f.comboTagT > 0) f.comboTagT--; else f.comboTag = '';
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
-  if (f.attackInputCd > 0) f.attackInputCd--; if (f.duelCooldown > 0) f.duelCooldown--;
+  if (f.attackInputCd > 0) f.attackInputCd--;
   if (f.chainT > 0) f.chainT--; if (f.hurtT > 0) f.hurtT--; if (f.landT > 0) f.landT--; if (f.healCd > 0) f.healCd--; if (f.placeCd > 0) f.placeCd--;
   if (f.takenT > 0 && --f.takenT <= 0) f.taken = 0;
   if (f.armCd > 0) f.armCd--; if (f.throwT > 0) f.throwT--; if (f.veil > 0) f.veil--;
@@ -6983,29 +7006,18 @@ function tickFighter(f, I) {
   if (I.armP && f.hurtT <= 0) throwArm(f, I.wx, I.wy);
   if (I.jumpP) f.jbuf = 7; else if (f.jbuf > 0) f.jbuf--;
   if (f.onGround) { f.coyote = 6; f.airDash = airDashMax(f); f.updraft = true; f.dblUsed = false; } else if (f.coyote > 0) f.coyote--;
-  if (f.stamDelay > 0) f.stamDelay--; else f.stam = min(f.maxstam, f.stam + .6 * (f.isPlayer && !WORLD.arena ? (f.tonic > 0 ? 1.8 : 1) * (WORLD.mode !== 1 && G.food <= 0 ? .5 : 1) * gearMul('st') : 1));
+  if (f.stamDelay > 0) f.stamDelay--;
   f.regenT++;
-  if (WORLD.arena && !WORLD.royale) { if (f.regenT > 240 && f.hp < f.maxhp && G.time % 4 === 0) f.hp++; }
-  else if (f.isPlayer && f.regenT > 420 / DIFF().regen && G.time % max(1, round((WORLD.mode === 1 || G.food > 70 ? 40 : G.food > 30 ? 80 : 1e9) / DIFF().regen / blessRegen())) === 0 && f.hp < f.maxhp) f.hp++;
   const W = heldOf(f), isW = W && W.type === 'weapon', free = f.hurtT <= 0;
   if (isW && free) {
     if (I.lp || I.rp) {
       const b = I.lp ? 'L' : 'H';
-      if (f.attackInputCd <= 0 && (!(WORLD.arena && !WORLD.royale && NET.duelMode) || f.duelCooldown <= 0)) {
+      if (f.attackInputCd <= 0) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
-          const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
-          const prog = clamp(f.atk.pt / rec, 0, 1);
-          if (prog >= .68) {
-            f.atkTiming = prog >= .78 && prog <= .92 ? 'perfect' : 'steady';
-            f.buf = { b, t: 10 };
-            f.attackInputCd = 8;
-            if (f === G.p) numPop(f.x + 3, f.y - 12, f.atkTiming === 'perfect' ? 'PERFECT' : 'TIMED', f.atkTiming === 'perfect' ? '#ffd35a' : '#7ddc6f');
-          } else {
-            f.atkTiming = 'rushed';
-            f.attackInputCd = 18;
-            if (f === G.p) numPop(f.x + 3, f.y - 12, 'WAIT', '#ff8a3d');
-          }
+          f.atkTiming = 'normal';
+          f.buf = { b, t: 10 };
+          f.attackInputCd = 4;
         }
       }
     }
@@ -9059,8 +9071,9 @@ function button(c, x, y, w, h, label, fn, o = {}) {
 function field(c, x, y, w, key, ph) {
   const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
-  if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
-  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
+  const display = v ? fitText(v, w - 8) : fitText(ph, w - 8);
+  drawText(c, display, x + 4, y + 4, v ? '#fff' : '#6a6485');
+  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(min(x + w - 5, x + 5 + textW(display)), y + 3, 1, 8); }
   hit(x, y, w, 14, () => { UI.focus = key; sfx('ui'); });
 }
 function chooser(c, x, y, w, label, names, key, descs) {
@@ -9317,8 +9330,8 @@ function drawAccounts(c) {
     button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
   } else {
     textC(c, 'SIGN IN TO CONTINUE', uw / 2, y + 17, '#b9bdd0', 1, drawText);
-    textC(c, 'Username and password work for profiles saved in this browser.', uw / 2, y + 28, '#8b8fa3', 1, drawText);
-    const rowH = 22, start = y + 34, visible = max(1, floor((h - 120) / rowH));
+    drawText(c, fitText('Username and password work for profiles saved in this browser.', w - 16), x + 8, y + 28, '#8b8fa3');
+    const rowH = 22, start = y + 44, visible = max(1, floor((h - 150) / rowH));
     UI.scroll = clamp(UI.scroll, 0, max(0, ACCOUNT.profiles.length - visible));
     for (let i = 0; i < visible; i++) {
       const p = ACCOUNT.profiles[i + UI.scroll]; if (!p) break;
@@ -9400,7 +9413,7 @@ function drawRingForm(c) {
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
   drawText(c, 'MODE', fx, y + 70, '#b9bdd0');
-  const modes = ['BOW', 'SWORD', 'GRAPPLE'];
+  const modes = ['BOW', 'SWORD', 'GRAPPLE SWORD'];
   modes.forEach((name, i) => button(c, fx + i * (fw / 3), y + 66, fw / 3 - 2, 16, name, () => { FORM.duelMode = i; sfx('ui'); }, { on: FORM.duelMode === i }));
   const descriptions = ['Long-range arrows.', 'A balanced close-range blade.', 'Sword strikes and a grappling hook.'];
   drawText(c, descriptions[FORM.duelMode], fx, y + 92, '#d8d4e6');
@@ -9427,20 +9440,11 @@ function drawDuelQueue(c) {
 function drawHUD(c) {
   const p = G.p, uw = VS.uw, uh = VS.uh, A = WORLD.arena;
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
+  if (!A && p.comboTag && p.comboTagT > 0) textS(c, p.comboTag, 15, 37, '#ffd35a');
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (A && NET.duelMode && !NET.spectating) {
-    const rw = 88, rx = round((uw - rw) / 2), ry = 4;
-    textC(c, 'RANGE ' + round((NET.duelMode === 'bow' ? 165 : 21.5) + (p.duelRange || 0)), uw / 2, ry, '#ffd35a', 1, textO);
-    bar(c, rx, ry + 9, rw, 3, (p.duelRange || 0) / 18, '#8ff5e6', '#2b2740');
-    if (p.duelCooldown > 0) textC(c, 'READY IN ' + (p.duelCooldown / 60).toFixed(1), uw / 2, ry + 15, '#d8d4e6', 1, textO);
-  }
-  if (p.atk && p.atk.phase === 2) {
-    const rec = max(1, round(p.atk.m.rec * (p.atk.tm || p.atk.W.wsp || 1))), prog = clamp(p.atk.pt / rec, 0, 1);
-    const w = 120, x = round((uw - w) / 2), y = hotbarLayout().y - 30;
-    bar(c, x, y, w, 5, prog, prog >= .78 && prog <= .92 ? '#ffd35a' : prog >= .68 ? '#7ddc6f' : '#ff8a3d', '#3a2a20');
-    c.fillStyle = '#ffd35a'; c.fillRect(x + round(w * .78), y - 1, max(1, round(w * .14)), 7);
-    textC(c, prog < .68 ? 'WAIT FOR THE RETURN' : prog <= .92 ? 'STRIKE NOW' : 'RECOVERING', uw / 2, y - 9, prog >= .68 && prog <= .92 ? '#ffd35a' : '#d8d4e6', 1, textO);
+    textC(c, 'RANGE ' + round(duelWeaponRange(p, heldOf(p))), uw / 2, 4, '#ffd35a', 1, textO);
   }
   if (!A && WORLD.mode !== 1) { const f = G.food / 100; bar(c, 15, 20, 72, 2, f, f < .25 && (G.time >> 4) & 1 ? '#ff9a8a' : '#e0a050', '#7a4a1a'); if (f < .3) textO(c, f <= 0 ? 'STARVING' : 'HUNGRY', 91, 16, '#e0a050'); }
   if (p.riposte > 0 && (G.time >> 2) & 1) textO(c, 'RIPOSTE READY', 15, 22, '#8ff5e6');
@@ -9504,7 +9508,7 @@ function drawRingStatus(c) {
   const uw = VS.uw, list = [...G.fighters].filter(f => !f.npc).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const w = 120, x = uw - w - 4; let y = 4;
   c.fillStyle = 'rgba(18,13,31,.62)'; c.fillRect(x, y, w, 13 + min(5, list.length) * 9); c.fillStyle = NET.status === 'online' ? '#7ddc6f' : '#ffb347'; c.fillRect(x, y, 2, 13 + min(5, list.length) * 9);
-  textS(c, NET.duelMode ? NET.duelMode.toUpperCase() + ' DUEL' : `RING ${NET.code.toUpperCase()}`, x + 6, y + 3, '#ffd35a'); drawText(c, NET.status === 'online' ? 'live' : NET.status === 'connecting' ? '...' : 'solo', x + w - 24, y + 3, NET.status === 'online' ? '#7ddc6f' : '#ffb347');
+  textS(c, `RING ${NET.code.toUpperCase()}`, x + 6, y + 3, '#ffd35a'); drawText(c, NET.status === 'online' ? 'live' : NET.status === 'connecting' ? '...' : 'solo', x + w - 24, y + 3, NET.status === 'online' ? '#7ddc6f' : '#ffb347');
   list.slice(0, 5).forEach((f, i) => { const yy = y + 13 + i * 9, me = f === G.p; drawText(c, (me ? '> ' : '') + f.name, x + 6, yy, me ? '#ffd35a' : f.echoBot ? '#b9bdd0' : '#8ff5e6'); drawText(c, String(f.kills), x + w - 8 - textW(f.kills), yy, '#fff'); });
   textC(c, ringStatusText(), uw / 2, 4, NET.status === 'online' ? '#7ddc6f' : '#ffb347', 1, textO);
   if (NET.roundOver) textC(c, 'next round in ' + ceil(NET.roundOver / 60), uw / 2, 14, '#fff', 1, textO);
@@ -10289,7 +10293,7 @@ function drawTrinketRow(c, x, y) {
 //  your screen really dodges). Nothing is stored; closing the page
 //  leaves the ring. Alone in a ring? Echoes spar with you instead.
 // ============================================================
-const NET = { room: null, roomReady: Promise.resolve(), R: null, transport: '', signalPeers: new Map(), sentAt: 0, status: 'off', code: 'open', me: '', peers: new Map(), seen: new Map(), hitSeq: 0, shotSeq: 0, hits: [], shots: [], rd: 0, roundOver: 0, winner: '', deathN: 0, kb: ['', 0], unsubs: [], joinTok: 0 };
+const NET = { room: null, roomReady: Promise.resolve(), R: null, transport: '', signalPeers: new Map(), sentAt: 0, status: 'off', code: 'open', me: '', peers: new Map(), queuePeers: new Map(), seen: new Map(), hitSeq: 0, shotSeq: 0, hits: [], shots: [], rd: 0, roundOver: 0, winner: '', deathN: 0, kb: ['', 0], unsubs: [], joinTok: 0, duelMode: '', duelMatch: '', duelPeer: '', duelQueueState: '', spectating: false, spectateRequest: false };
 const RING_WEAPONS = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku'], ECHO_WEAPONS = ['sword', 'sword', 'spear', 'spear', 'fangs', 'fangs', 'maul', 'bow', 'nunchaku', 'nunchaku'], SHOT_TYPES = ['arrow', 'bomb', 'knife', 'javelin', 'wave', 'star', 'hook', 'flask', 'pellet'], ARM_SHOTS = ['star', 'hook', 'flask', 'pellet'];
 const KILLS_TO_WIN = 10, ECHO_NAMES = ['ECHO OF ASH', 'ECHO OF GLASS', 'ECHO OF RUST', 'ECHO OF DUSK', 'ECHO OF EMBER', 'ECHO OF MOSS'];
 const num = (v, d = 0) => typeof v === 'number' && isFinite(v) ? v : d;
@@ -10306,7 +10310,7 @@ async function netJoin(code) {
   const tok = ++NET.joinTok;
   NET.transport = ''; NET.signalPeers.clear();
   await NET.roomReady;
-  if (tok !== NET.joinTok || !WORLD.arena) return;
+  if (tok !== NET.joinTok || (!WORLD.arena && G.state !== 'duelQueue')) return;
   if (!NET.room) {
     NET.transport = 'signal'; NET.status = 'connecting';
     NET.me = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -10317,7 +10321,7 @@ async function netJoin(code) {
   NET.status = 'connecting';
   try {
     const R = await NET.room.join('ring-' + NET.code);
-    if (tok !== NET.joinTok || !WORLD.arena) { try { R.leave(); } catch (e) { } return; }
+    if (tok !== NET.joinTok || (!WORLD.arena && G.state !== 'duelQueue')) { try { R.leave(); } catch (e) { } return; }
     NET.R = R; NET.status = R.connected() ? 'online' : 'connecting';
     NET.unsubs.push(R.onPeers(ch => { if (NET.R === R) netPeers(ch.peers); }, () => { if (NET.R === R) NET.status = 'offline'; }));
     NET.unsubs.push(R.onConnection(c => { if (NET.R === R && NET.status !== 'offline') NET.status = c ? 'online' : 'connecting'; }, () => { if (NET.R === R) NET.status = 'offline'; }));
@@ -10331,8 +10335,9 @@ function netLeave() {
     sigStop();
   }
   if (NET.R) { try { NET.R.leave().catch(() => { }); } catch (e) { } } NET.R = null; NET.status = 'off';
-  NET.transport = ''; NET.signalPeers.clear();
+  NET.transport = ''; NET.signalPeers.clear(); NET.queuePeers.clear();
   for (const f of NET.peers.values()) f.gone = true; NET.peers.clear(); G.fighters = G.fighters.filter(f => !f.gone);
+  NET.duelMode = ''; NET.duelMatch = ''; NET.duelPeer = ''; NET.duelQueueState = ''; NET.spectating = false; NET.spectateRequest = false;
 }
 function netSignalMessage(m) {
   if (NET.transport !== 'signal' || !m || typeof m.g !== 'string' || m.g === NET.me || m.ring !== NET.code) return;
@@ -10358,10 +10363,14 @@ function netSignalRefresh(now) {
 function netPeers(list) {
   if (BR.on) return brPeers(list);
   const here = new Set();
+  NET.queuePeers.clear();
   for (const pe of list) {
     if (pe.isMe && pe.sameTab) { NET.me = pe.peer; continue; }
     if (pe.kind !== 'viewer') continue;
     const s = pe.presence; if (!s || s.v !== 1 || s.ring !== NET.code) continue;
+    if (NET.duelMode && s.qm === NET.duelMode && ['waiting', 'paired', 'playing', 'watching'].includes(s.q)) NET.queuePeers.set(pe.peer, s);
+    if (s.watch) continue;
+    if (NET.duelMode && (!NET.duelMatch || s.dm !== NET.duelMatch)) continue;
     here.add(pe.peer);
     let f = NET.peers.get(pe.peer);
     if (!f) {
@@ -10429,7 +10438,8 @@ function netPresence() {
     v: 1, ring: NET.code, n: G.nick, sk: G.skin, w: W && RING_WEAPONS.includes(W.id) ? W.id : 'sword', x: r1(p.x), y: r1(p.y), vx: r2(p.vx), vy: r2(p.vy), f: p.face, g: p.onGround ? 1 : 0,
     st: p.dead ? 4 : p.state === 'dodge' ? 2 : p.hurtT > 0 ? 3 : a ? 1 : 0, dd: p.dodgeDir, hp: max(0, round(p.hp)), k: p.kills, d: p.deaths, rd: NET.rd,
     m: a ? a.id : '', an: p.atkN, mp: a ? a.phase : 0, mt: a ? a.pt : 0, ma: a ? r2(a.aimA) : 0, md: a ? round(a.dist) : 0, mc: a ? a.charge : 0, mf: a ? a.face : p.face, rp: p.riposte > 0 ? 1 : 0, sp: p.inv > 30 ? 1 : 0,
-    hs: NET.hits, ps: NET.shots, kb: NET.kb, sx: p.st ? [p.st.pin > 0 ? (p.st.pinS || 0) + 2 : 0, p.st.burn > 0 ? 1 : 0, p.st.blind > 0 ? 1 : 0, p.st.hook > 0 || p.st.reel > 0 ? 1 : 0] : 0, lk: p.state === 'link' ? 1 : 0
+    hs: NET.hits, ps: NET.shots, kb: NET.kb, sx: p.st ? [p.st.pin > 0 ? (p.st.pinS || 0) + 2 : 0, p.st.burn > 0 ? 1 : 0, p.st.blind > 0 ? 1 : 0, p.st.hook > 0 || p.st.reel > 0 ? 1 : 0] : 0, lk: p.state === 'link' ? 1 : 0,
+    qm: NET.duelMode || '', q: NET.duelQueueState || '', dm: NET.duelMatch || '', dp: NET.duelPeer || '', watch: NET.spectating ? 1 : 0
   };
 }
 function netSend() {
@@ -10474,14 +10484,73 @@ function tickRemote(f) {
 }
 
 // ---------------- the arena itself ----------------
-function enterArena(nick, skin, code) {
-  if (BR.on) brLeave(); netLeave(); if (COOP.role) coopLeave(); WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0; genArena(); freshSession();
+function enterArena(nick, skin, code, duelMode = '', queued = false, spectating = false) {
+  if (BR.on) brLeave();
+  if (!queued) netLeave();
+  if (COOP.role) coopLeave();
+  WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0;
+  if (!queued) { genArena(); freshSession(); }
   G.nick = nick; G.skin = skin; NET.rd = 0; NET.roundOver = 0; NET.deathN = 0; NET.kb = ['', 0]; G.echoT = 60;
+  NET.duelMode = duelMode; NET.spectating = spectating; NET.duelQueueState = duelMode ? (spectating ? 'watching' : 'playing') : '';
   accountSaveProfile();
-  inv = new Array(INV_N).fill(null); RING_WEAPONS.forEach((id, i) => inv[i] = { id, n: 1 });
-  G.p = newPlayer(); G.fighters = [G.p]; G.npcs = []; G.clock = .57; arenaRespawn(G.p); G.p.inv = 60;
-  snapCam(); G.state = 'play'; G.banner = { text: 'DUEL MATCH', sub: NET.room ? 'queue: ' + (code || 'duel') : 'practice with the echoes', t: 0 };
-  netJoin(code || 'open');
+  inv = new Array(INV_N).fill(null);
+  if (duelMode) inv[0] = { id: duelMode === 'bow' ? 'bow' : 'sword', n: 1 };
+  else RING_WEAPONS.forEach((id, i) => inv[i] = { id, n: 1 });
+  G.p = newPlayer(); G.p.duelRange = 0; G.fighters = []; G.npcs = []; G.clock = .57;
+  if (spectating) { G.p.dead = true; G.p.deadT = 100; }
+  else { G.fighters = [G.p]; arenaRespawn(G.p); G.p.inv = 60; }
+  snapCam(); G.state = 'play'; G.banner = { text: spectating ? 'SPECTATING' : 'DUEL MATCH', sub: duelMode ? duelMode.toUpperCase() + ' DUEL' : NET.room ? 'queue: ' + (code || 'duel') : 'practice with the echoes', t: 0 };
+  if (!queued) netJoin(code || 'open');
+}
+function enterDuelQueue(mode, nick, skin, spectate = false) {
+  netLeave(); if (COOP.role) coopLeave(); WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0; genArena(); freshSession();
+  G.nick = nick; G.skin = skin; NET.duelMode = mode; NET.duelQueueState = spectate ? 'spectate' : 'waiting'; NET.spectateRequest = spectate;
+  NET.duelMatch = ''; NET.duelPeer = ''; NET.spectating = false; NET.queuePeers.clear();
+  accountSaveProfile(); inv = new Array(INV_N).fill(null); inv[0] = { id: mode === 'bow' ? 'bow' : 'sword', n: 1 };
+  G.p = newPlayer(); G.fighters = []; G.npcs = []; G.state = 'duelQueue'; G.banner = null;
+  netJoin('duel-' + mode);
+}
+function duelPairId(a, b) {
+  let h = 2166136261;
+  for (const ch of [a, b].sort().join('|')) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return NET.duelMode + '-' + (h >>> 0).toString(36);
+}
+function duelQueueTick() {
+  if (G.state !== 'duelQueue' || !NET.duelMode) return;
+  if (NET.spectateRequest) {
+    const active = [...NET.queuePeers.entries()].filter(([, p]) => p.q === 'playing' && p.dm).sort((a, b) => a[1].dm.localeCompare(b[1].dm));
+    if (active.length) {
+      NET.duelMatch = active[0][1].dm; NET.duelPeer = ''; NET.spectating = true; NET.spectateRequest = false;
+      enterArena(G.nick, G.skin, NET.code, NET.duelMode, true, true); return;
+    }
+    netSend(); return;
+  }
+  if (NET.duelQueueState === 'waiting' && NET.me) {
+    const partner = [...NET.queuePeers.entries()].find(([id, p]) => p.q === 'paired' && p.dp === NET.me && p.dm);
+    if (partner) { NET.duelPeer = partner[0]; NET.duelMatch = partner[1].dm; NET.duelQueueState = 'paired'; }
+    else {
+      const waiting = [NET.me, ...[...NET.queuePeers].filter(([, p]) => p.q === 'waiting').map(([id]) => id)].sort();
+      const i = waiting.indexOf(NET.me);
+      if (i >= 0 && i % 2 === 0 && waiting[i + 1]) {
+        NET.duelPeer = waiting[i + 1]; NET.duelMatch = duelPairId(NET.me, NET.duelPeer); NET.duelQueueState = 'paired';
+      } else if (i > 0 && i % 2 === 1) {
+        NET.duelPeer = waiting[i - 1]; NET.duelMatch = duelPairId(NET.me, NET.duelPeer); NET.duelQueueState = 'paired';
+      }
+    }
+  }
+  if (NET.duelQueueState === 'paired') {
+    const partner = NET.queuePeers.get(NET.duelPeer);
+    if (partner && partner.dm === NET.duelMatch && partner.dp === NET.me && ['paired', 'playing'].includes(partner.q)) {
+      const mode = NET.duelMode, match = NET.duelMatch;
+      enterArena(G.nick, G.skin, NET.code, mode, true, false);
+      NET.duelMatch = match; NET.duelQueueState = 'playing';
+      netSend(); return;
+    }
+  }
+  netSend();
+}
+function cancelDuelQueue() {
+  netLeave(); WORLD.arena = false; G.state = 'ring'; G.fighters = []; UI.focus = null;
 }
 function arenaRespawn(f) {
   let best = ARENA_SPAWNS[0], bd = -1;
@@ -10514,6 +10583,11 @@ function resetRound() {
 }
 function arenaTick() {
   if (WORLD.royale) return brTick();
+  if (NET.spectating) {
+    const live = G.fighters.filter(f => f.remote && !f.dead);
+    if (live.length) { const x = live.reduce((n, f) => n + f.x, 0) / live.length, y = live.reduce((n, f) => n + f.y, 0) / live.length; G.cam.x = camX(x - VS.vw / 2); G.cam.y = camY(y - VS.vh / 2); }
+  }
+  if (NET.duelMode) { if (G.time % 3 === 0) netSend(); return; }
   const humans = NET.peers.size, echoes = G.fighters.filter(f => f.echoBot);
   if (humans === 0) { if (echoes.length < 3 && --G.echoT <= 0) { spawnEcho(); G.echoT = 100; } }
   else if (echoes.length) { const e = echoes[0]; e.gone = true; burst(e.x + 3, e.y + 10, 30, SPARK, 2.6, 40, { glow: 1 }); G.fighters = G.fighters.filter(f => !f.gone); if (echoes.length === 1) say('Another Waker has entered the ring. The echoes step aside.'); }
@@ -10599,7 +10673,16 @@ function brFlat(x0, x1, gy, b) {
 // a ramp of earth so the ground beside a flattened place stays walkable
 function brEase(x, dir, gy) { for (let k = 1; k < 30; k++) { const xx = x + dir * k; if (xx < 3 || xx > BRW - 4) return; const want = gy + sign(heights[xx] - gy) * min(abs(heights[xx] - gy), k * 2); if (want === heights[xx]) return; brFlat(xx, xx, want); } }
 function brChest(x, y, rare, o = {}) {
-  if (!inW(x, y) || tiles[y * WW + x] !== AIR || !TP[tileAt(x, y + 1)].solid && tileAt(x, y + 1) !== PLATFORM) return null;
+  x = floor(x); y = floor(y);
+  if (!inW(x, y)) return null;
+  let placed = false;
+  for (let dy = -6; dy <= 6 && !placed; dy++) {
+    const cy = y + dy;
+    if (!inW(x, cy) || tiles[cy * WW + x] !== AIR) continue;
+    const below = tileAt(x, cy + 1);
+    if (TP[below].solid || below === PLATFORM) { y = cy; placed = true; }
+  }
+  if (!placed) return null;
   for (const c of BR.chests) if (abs(c.x - x) < 3 && abs(c.y - y) < 3) return null;
   const c = { i: BR.chests.length, x, y, rare: !!rare, cave: !!o.cave, high: !!o.high, open: false, t: 0 }; BR.chests.push(c); return c;
 }
@@ -13159,7 +13242,9 @@ function genVeil(seed) { const w = 90, h = 6; const [c, x] = mk(w, h); const R =
 function resize() {
   const W = max(320, innerWidth), H = max(240, innerHeight); cv.width = W; cv.height = H;
   // the world is drawn at a whole-pixel scale that shows about 40 to 55 tiles from top to bottom; menus keep their own size
-  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s; VS.ui = clamp(round(H / 250), 2, 6) >= 4 ? 3 : 2; VS.uw = W / VS.ui; VS.uh = H / VS.ui;
+  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s;
+  VS.ui = W >= 900 && H >= 650 ? 3 : 2;
+  VS.uw = W / VS.ui; VS.uh = H / VS.ui;
   ctx.imageSmoothingEnabled = false;
   const bw = ceil(VS.vw) + 2, bh = ceil(VS.vh) + 2;[acv, actx] = mk(bw, bh);[lcv, lctx] = mk(bw, bh);[fcv, fctx] = mk(bw, bh);[gcv, gctx] = mk(bw, bh);[glcv, glctx] = mk(bw, bh); wctx = ctx;
   const mkV = (r, g, b, k) => { const [c, vx] = mk(64, 36); const d = vx.createImageData(64, 36); for (let Y = 0; Y < 36; Y++) for (let X = 0; X < 64; X++) { const q = hypot((X - 31.5) / 32, (Y - 17.5) / 18), i = (Y * 64 + X) * 4; d.data[i] = r; d.data[i + 1] = g; d.data[i + 2] = b; d.data[i + 3] = 255 * clamp((q - .62) * k, 0, 1); } vx.putImageData(d, 0, 0); return c; };
@@ -13535,7 +13620,7 @@ function ambient() {
 }
 function snapCam() { const p = G.p; G.cam.x = G.cam.px = camX(p.x + 3 - VS.vw / 2); G.cam.y = G.cam.py = camY(p.y + 4 - VS.vh / 2 - 8); }
 function tickCam() {
-  const c = G.cam, p = brCamTarget() || G.p; c.px = c.x; c.py = c.y;
+  const c = G.cam, watchers = NET.spectating ? G.fighters.filter(f => f.remote && !f.dead) : [], p = watchers.length ? { x: watchers.reduce((n, f) => n + f.x, 0) / watchers.length, y: watchers.reduce((n, f) => n + f.y, 0) / watchers.length } : brCamTarget() || G.p; c.px = c.x; c.py = c.y;
   const lx = (mouse.x / VS.s - VS.vw / 2) * .15, ly = (mouse.y / VS.s - VS.vh / 2) * .15, free = !UI.open && !G.dialog && !G.cine && !G.link;
   const spy = G.spy && free && !WORLD.arena && hasItem('spyglass') ? 1 : 0; if (G.spy && !spy && !hasItem('spyglass')) G.spy = false;
   let tx = p.x + 3 - VS.vw / 2 + (free ? lx * (1 + spy * 9) : 0), ty = p.y + 4 - VS.vh / 2 + (free ? ly * (1 + spy * 7) : 0) - (G.boss ? 22 : 8), k = spy ? .06 : .14;
@@ -13590,8 +13675,8 @@ function frame(now) {
     G.time++; if (G.state !== 'play') { G.clock = (G.clock + 1 / 20000) % 1; } updateSun(); tickParts(); const c = G.cam; c.px = c.x; c.py = c.y;
     if (G.state !== 'play' && G.state !== 'intro') { c.x += .3; if (WORLD.endless) { streamTo(c.x + VS.vw / 2); if (c.x > (SPAWN_X + 600) * T) c.x = c.px = (SPAWN_X - 200) * T; } else if (c.x > WW * T - VS.vw - 2) c.x = c.px = 0; const hx = clamp(floor((c.x + VS.vw / 2) / T), 0, WW - 1); c.y += (camY(heights[hx] * T - VS.vh * .62) - c.y) * .02; c.x = camX(c.x); }
     if (G.state === 'intro') G.introT++;
-    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     if (BR.on && G.state === 'brlobby') brLobbyTick();
+    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     G.shake *= .86; G.flash *= .88; acc = 1;
     if (WORLD.arena && G.state === 'play' && G.time % 3 === 0) netSend();
   }

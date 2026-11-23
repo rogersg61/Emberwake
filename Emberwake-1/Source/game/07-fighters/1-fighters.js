@@ -21,6 +21,7 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
+    comboSeq: '', comboT: 0, comboN: 0, comboTag: '', comboTagT: 0,
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal'
   };
   Object.assign(f, o);
@@ -93,6 +94,8 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.comboT > 0) f.comboT--; else { f.comboSeq = ''; f.comboN = 0; }
+  if (f.comboTagT > 0) f.comboTagT--; else f.comboTag = '';
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
   if (f.attackInputCd > 0) f.attackInputCd--; if (f.duelCooldown > 0) f.duelCooldown--;
@@ -105,10 +108,8 @@ function tickFighter(f, I) {
   if (I.armP && f.hurtT <= 0) throwArm(f, I.wx, I.wy);
   if (I.jumpP) f.jbuf = 7; else if (f.jbuf > 0) f.jbuf--;
   if (f.onGround) { f.coyote = 6; f.airDash = airDashMax(f); f.updraft = true; f.dblUsed = false; } else if (f.coyote > 0) f.coyote--;
-  if (f.stamDelay > 0) f.stamDelay--; else f.stam = min(f.maxstam, f.stam + .6 * (f.isPlayer && !WORLD.arena ? (f.tonic > 0 ? 1.8 : 1) * (WORLD.mode !== 1 && G.food <= 0 ? .5 : 1) * gearMul('st') : 1));
+  if (f.stamDelay > 0) f.stamDelay--;
   f.regenT++;
-  if (WORLD.arena && !WORLD.royale) { if (f.regenT > 240 && f.hp < f.maxhp && G.time % 4 === 0) f.hp++; }
-  else if (f.isPlayer && f.regenT > 420 / DIFF().regen && G.time % max(1, round((WORLD.mode === 1 || G.food > 70 ? 40 : G.food > 30 ? 80 : 1e9) / DIFF().regen / blessRegen())) === 0 && f.hp < f.maxhp) f.hp++;
   const W = heldOf(f), isW = W && W.type === 'weapon', free = f.hurtT <= 0;
   if (isW && free) {
     if (I.lp || I.rp) {
@@ -116,18 +117,9 @@ function tickFighter(f, I) {
       if (f.attackInputCd <= 0 && (!(WORLD.arena && !WORLD.royale && NET.duelMode) || f.duelCooldown <= 0)) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
-          const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
-          const prog = clamp(f.atk.pt / rec, 0, 1);
-          if (prog >= .68) {
-            f.atkTiming = prog >= .78 && prog <= .92 ? 'perfect' : 'steady';
-            f.buf = { b, t: 10 };
-            f.attackInputCd = 8;
-            if (f === G.p) numPop(f.x + 3, f.y - 12, f.atkTiming === 'perfect' ? 'PERFECT' : 'TIMED', f.atkTiming === 'perfect' ? '#ffd35a' : '#7ddc6f');
-          } else {
-            f.atkTiming = 'rushed';
-            f.attackInputCd = 18;
-            if (f === G.p) numPop(f.x + 3, f.y - 12, 'WAIT', '#ff8a3d');
-          }
+          f.atkTiming = 'normal';
+          f.buf = { b, t: 10 };
+          f.attackInputCd = 4;
         }
       }
     }

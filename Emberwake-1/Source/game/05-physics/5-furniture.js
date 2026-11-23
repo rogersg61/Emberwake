@@ -160,7 +160,6 @@ function furnFoes(cx, cy, r) { const out = []; for (const e of G.enemies) if (!e
 function tickFurniture() {
   const p = G.p; if (!p) return; const host = !netGuest(); oreSeekerFx();
   if (G.time % 20 === 0) { const ptx = floor((p.x + 3) / T), pty = floor((p.y + 10) / T); G.nearWarm = !!furnNear(ptx, pty, [BRAZIER], 5, 4); G.nearFount = !!furnNear(ptx, pty, [FOUNTAIN], 3, 3); }
-  if (G.nearFount && !p.dead && p.hp < p.maxhp && p.regenT > 120 && G.time % 40 === 0) { p.hp = min(p.maxhp, p.hp + 1); if (G.time % 120 === 0) P(p.x + 3, p.y + 4, 0, -.5, 30, '#8fd0d8', { glow: 1, g: -.01 }); }
   for (const [i, s] of STN) {
     const t = s.t; if (!FURN_IDS.has(t) || tiles[i] !== t) continue; const tx = i % WW, ty = (i / WW) | 0, cx = tx * T + 4, cy = ty * T + 4;
     if (t === PLANTER) { if (s.crop && CROPS[s.crop]) { const C = CROPS[s.crop], sun = G.sun > .45 && ty < SKYL[tx] && !walls[i]; s.grow += C.dark ? (sun ? .6 : 1.2) : (sun ? 1.4 : .8); } continue; }

@@ -451,7 +451,6 @@ function tickDims() {
   const p = G.p, F = G.flags; if (!p) return;
   if (F.gateOpen && !F.dim1) F.dim1 = true;
   const mh = 100 + bonusHP(); if (p.maxhp !== mh) { p.maxhp = mh; if (p.hp > mh) p.hp = mh; }
-  if (gearHas('regrowth') && !p.dead && p.hp < p.maxhp && p.regenT > 150 && G.time % 24 === 0) p.hp++;
   if (DIM === 3) {
     if (p.onGround && !p.dead && solidAt(floor((p.x + 3) / T), floor((p.y + p.h + 2) / T))) G.lastSafe = { x: p.x, y: p.y };
     if (p.y > (WH - 34) * T && !p.dead) {

@@ -65,14 +65,14 @@ async def main():
             p.onGround = true; p.vx = 0; p.vy = 0; applyHit(a, e, e.x, e.y);
             const ground = NET.hits.at(-1)[2], groundKb = NET.hits.at(-1)[3];
             a.pt = 20; a.hits.clear(); p.onGround = false; p.vx = 2; p.vy = 3; applyHit(a, e, e.x, e.y);
-            return { simple, attackCooldown, cooldown, firstHitRange, maxRange, blocked, blockedRange, reset, knockback, hitstun, startingRange, aimRange, groundKb, sprintKb: NET.hits.at(-1)[3], fallingRatio: NET.hits.at(-1)[2] / ground };
+            return { simple, attackCooldown, cooldown, firstHitRange, maxRange, blocked, blockedRange, reset, knockback, hitstun, startingRange, expectedRange: ARM + IT.sword.len, aimRange, groundKb, sprintKb: NET.hits.at(-1)[3], fallingRatio: NET.hits.at(-1)[2] / ground };
           } finally { Math.random = random; }
         })()""")
         assert combat['simple'] and combat['attackCooldown'] == 14 and combat['cooldown'], combat
         assert combat['firstHitRange'] == 5 and combat['maxRange'] == 18, combat
         assert combat['blocked'] and combat['blockedRange'] == 18 and combat['reset'], combat
         assert combat['knockback'] >= 2 and combat['hitstun'] == 24, combat
-        assert combat['startingRange'] == 2 * 8 and abs(combat['aimRange'] - combat['startingRange']) < .01, combat
+        assert combat['startingRange'] == combat['expectedRange'] and abs(combat['aimRange'] - combat['startingRange']) < .01, combat
         assert combat['groundKb'] == 2.4 and combat['sprintKb'] == 5.2, combat
         assert 1.15 <= combat['fallingRatio'] <= 1.35, combat
 

@@ -72,7 +72,16 @@ function brFlat(x0, x1, gy, b) {
 // a ramp of earth so the ground beside a flattened place stays walkable
 function brEase(x, dir, gy) { for (let k = 1; k < 30; k++) { const xx = x + dir * k; if (xx < 3 || xx > BRW - 4) return; const want = gy + sign(heights[xx] - gy) * min(abs(heights[xx] - gy), k * 2); if (want === heights[xx]) return; brFlat(xx, xx, want); } }
 function brChest(x, y, rare, o = {}) {
-  if (!inW(x, y) || tiles[y * WW + x] !== AIR || !TP[tileAt(x, y + 1)].solid && tileAt(x, y + 1) !== PLATFORM) return null;
+  x = floor(x); y = floor(y);
+  if (!inW(x, y)) return null;
+  let placed = false;
+  for (let dy = -6; dy <= 6 && !placed; dy++) {
+    const cy = y + dy;
+    if (!inW(x, cy) || tiles[cy * WW + x] !== AIR) continue;
+    const below = tileAt(x, cy + 1);
+    if (TP[below].solid || below === PLATFORM) { y = cy; placed = true; }
+  }
+  if (!placed) return null;
   for (const c of BR.chests) if (abs(c.x - x) < 3 && abs(c.y - y) < 3) return null;
   const c = { i: BR.chests.length, x, y, rare: !!rare, cave: !!o.cave, high: !!o.high, open: false, t: 0 }; BR.chests.push(c); return c;
 }
