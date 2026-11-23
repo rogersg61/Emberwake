@@ -96,8 +96,6 @@ function tickMeal() {
   if (G.meal && G.meal.t > 0 && --G.meal.t <= 0) { say('The meal wears off.'); G.meal = null; }
   if (G.rest > 0) G.rest--;
   if (!p.dead && p.hp < p.maxhp && G.state === 'play') {
-    if (boonHas('regen2') && G.time % 50 === 0) p.hp = min(p.maxhp, p.hp + 1);
-    else if (boonHas('regen') && p.regenT > 300 && G.time % 80 === 0) p.hp = min(p.maxhp, p.hp + 1);
   }
 }
 function drawMealHud(c) {

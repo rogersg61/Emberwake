@@ -2606,7 +2606,6 @@ function tickDims() {
   const p = G.p, F = G.flags; if (!p) return;
   if (F.gateOpen && !F.dim1) F.dim1 = true;
   const mh = 100 + bonusHP(); if (p.maxhp !== mh) { p.maxhp = mh; if (p.hp > mh) p.hp = mh; }
-  if (gearHas('regrowth') && !p.dead && p.hp < p.maxhp && p.regenT > 150 && G.time % 24 === 0) p.hp++;
   if (DIM === 3) {
     if (p.onGround && !p.dead && solidAt(floor((p.x + 3) / T), floor((p.y + p.h + 2) / T))) G.lastSafe = { x: p.x, y: p.y };
     if (p.y > (WH - 34) * T && !p.dead) {
@@ -4098,8 +4097,6 @@ function tickMeal() {
   if (G.meal && G.meal.t > 0 && --G.meal.t <= 0) { say('The meal wears off.'); G.meal = null; }
   if (G.rest > 0) G.rest--;
   if (!p.dead && p.hp < p.maxhp && G.state === 'play') {
-    if (boonHas('regen2') && G.time % 50 === 0) p.hp = min(p.maxhp, p.hp + 1);
-    else if (boonHas('regen') && p.regenT > 300 && G.time % 80 === 0) p.hp = min(p.maxhp, p.hp + 1);
   }
 }
 function drawMealHud(c) {
@@ -5416,7 +5413,6 @@ function furnFoes(cx, cy, r) { const out = []; for (const e of G.enemies) if (!e
 function tickFurniture() {
   const p = G.p; if (!p) return; const host = !netGuest(); oreSeekerFx();
   if (G.time % 20 === 0) { const ptx = floor((p.x + 3) / T), pty = floor((p.y + 10) / T); G.nearWarm = !!furnNear(ptx, pty, [BRAZIER], 5, 4); G.nearFount = !!furnNear(ptx, pty, [FOUNTAIN], 3, 3); }
-  if (G.nearFount && !p.dead && p.hp < p.maxhp && p.regenT > 120 && G.time % 40 === 0) { p.hp = min(p.maxhp, p.hp + 1); if (G.time % 120 === 0) P(p.x + 3, p.y + 4, 0, -.5, 30, '#8fd0d8', { glow: 1, g: -.01 }); }
   for (const [i, s] of STN) {
     const t = s.t; if (!FURN_IDS.has(t) || tiles[i] !== t) continue; const tx = i % WW, ty = (i / WW) | 0, cx = tx * T + 4, cy = ty * T + 4;
     if (t === PLANTER) { if (s.crop && CROPS[s.crop]) { const C = CROPS[s.crop], sun = G.sun > .45 && ty < SKYL[tx] && !walls[i]; s.grow += C.dark ? (sun ? .6 : 1.2) : (sun ? 1.4 : .8); } continue; }
@@ -6983,10 +6979,8 @@ function tickFighter(f, I) {
   if (I.armP && f.hurtT <= 0) throwArm(f, I.wx, I.wy);
   if (I.jumpP) f.jbuf = 7; else if (f.jbuf > 0) f.jbuf--;
   if (f.onGround) { f.coyote = 6; f.airDash = airDashMax(f); f.updraft = true; f.dblUsed = false; } else if (f.coyote > 0) f.coyote--;
-  if (f.stamDelay > 0) f.stamDelay--; else f.stam = min(f.maxstam, f.stam + .6 * (f.isPlayer && !WORLD.arena ? (f.tonic > 0 ? 1.8 : 1) * (WORLD.mode !== 1 && G.food <= 0 ? .5 : 1) * gearMul('st') : 1));
+  if (f.stamDelay > 0) f.stamDelay--;
   f.regenT++;
-  if (WORLD.arena && !WORLD.royale) { if (f.regenT > 240 && f.hp < f.maxhp && G.time % 4 === 0) f.hp++; }
-  else if (f.isPlayer && f.regenT > 420 / DIFF().regen && G.time % max(1, round((WORLD.mode === 1 || G.food > 70 ? 40 : G.food > 30 ? 80 : 1e9) / DIFF().regen / blessRegen())) === 0 && f.hp < f.maxhp) f.hp++;
   const W = heldOf(f), isW = W && W.type === 'weapon', free = f.hurtT <= 0;
   if (isW && free) {
     if (I.lp || I.rp) {
