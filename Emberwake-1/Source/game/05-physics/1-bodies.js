@@ -56,12 +56,7 @@ function moveBody(e) {
 }
 
 // ---------------- particles ----------------
-function P(x, y, vx, vy, life, col, o) {
-  const limit = SETTINGS.fpsMode ? 260 : SETTINGS.fpsQuality > 75 ? 1800 : 900;
-  if (G.parts.length >= limit) return;
-  const p = { x, y, vx, vy, life, max: life, col, sz: 1, g: .12, fr: .985, glow: 0, hit: 0 };
-  if (o) Object.assign(p, o); G.parts.push(p);
-}
+function P(x, y, vx, vy, life, col, o) { if (SETTINGS.fpsMode || G.parts.length > 1400) return; const p = { x, y, vx, vy, life, max: life, col, sz: 1, g: .12, fr: .985, glow: 0, hit: 0 }; if (o) Object.assign(p, o); G.parts.push(p); }
 function burst(x, y, n, cols, sp, life, o) { for (let i = 0; i < n; i++) { const a = frand(TAU), v = frand(.2, 1) * sp; P(x, y, cos(a) * v, sin(a) * v, max(4, life * frand(.5, 1) | 0), fpick(cols), o); } }
 function tickParts() {
   const a = G.parts;
@@ -80,7 +75,7 @@ function sparks(x, y, n, dirx = 0, sp = 2.4, cols = SPARK) { for (let i = 0; i <
 function dust(x, y, n, col = '#b9bdd0', sp = .8) { for (let i = 0; i < n; i++) P(x + frand(-3, 3), y, frand(-1, 1) * sp, frand(-.7, -.1), frand(14, 28) | 0, col, { g: -.005, fr: .93 }); }
 
 // ---------------- drops ----------------
-function spawnDrop(id, n, x, y, vx, vy) { if (!IT[id] || n <= 0 || COOP.applying) return; for (const d of G.drops) if (d.id === id && d.t < 40 && abs(d.x + 3 - x) < 8 && abs(d.y + 3 - y) < 8 && d.n + n <= IT[id].stack) { d.n += n; return; } if (G.drops.length >= 300) G.drops.shift(); G.drops.push({ id, n, x: x - 3, y: y - 3, px: x - 3, py: y - 3, w: 6, h: 6, vx: vx === undefined ? frand(-1, 1) : vx, vy: vy === undefined ? frand(-2, -.8) : vy, t: 0, delay: 26, onGround: false }); }
+function spawnDrop(id, n, x, y, vx, vy) { if (!IT[id] || n <= 0 || COOP.applying) return; for (const d of G.drops) if (d.id === id && d.t < 40 && abs(d.x + 3 - x) < 8 && abs(d.y + 3 - y) < 8 && d.n + n <= IT[id].stack) { d.n += n; return; } G.drops.push({ id, n, x: x - 3, y: y - 3, px: x - 3, py: y - 3, w: 6, h: 6, vx: vx === undefined ? frand(-1, 1) : vx, vy: vy === undefined ? frand(-2, -.8) : vy, t: 0, delay: 26, onGround: false }); }
 function tickDrops() {
   const p = G.p, a = G.drops;
   for (let i = a.length - 1; i >= 0; i--) {
@@ -98,7 +93,6 @@ function tickDrops() {
 // owner = the fighter who threw it (it hurts that fighter's foes); no owner = a monster's (it hurts the player's side).
 // ghost = a copy of someone else's shot, shown on this screen only: their own browser decides what it hits.
 function spawnProj(o) {
-  if (G.projs.length >= (SETTINGS.fpsMode ? 100 : 260)) G.projs.shift();
   const pr = Object.assign({ x: 0, y: 0, vx: 0, vy: 0, r: 3, dmg: 5, owner: null, life: 120, type: 'bolt', g: 0, hits: new Set(), t: 0, kb: [2, -1], boom: 0 }, o); pr.px = pr.x; pr.py = pr.y;
   if (COOP.ghostFx) pr.ghost = true;
   G.projs.push(pr); if (pr.owner && (pr.owner === G.p || (pr.owner.brBot && !pr.owner.remote)) && !pr.ghost) netShot(pr); netShotOut(pr); return pr;

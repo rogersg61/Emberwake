@@ -29,9 +29,7 @@ function genVeil(seed) { const w = 90, h = 6; const [c, x] = mk(w, h); const R =
 function resize() {
   const W = max(320, innerWidth), H = max(240, innerHeight); cv.width = W; cv.height = H;
   // the world is drawn at a whole-pixel scale that shows about 40 to 55 tiles from top to bottom; menus keep their own size
-  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s;
-  VS.ui = W >= 900 && H >= 650 ? 3 : 2;
-  VS.uw = W / VS.ui; VS.uh = H / VS.ui;
+  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s; VS.ui = clamp(round(H / 250), 2, 6) >= 4 ? 3 : 2; VS.uw = W / VS.ui; VS.uh = H / VS.ui;
   ctx.imageSmoothingEnabled = false;
   const bw = ceil(VS.vw) + 2, bh = ceil(VS.vh) + 2;[acv, actx] = mk(bw, bh);[lcv, lctx] = mk(bw, bh);[fcv, fctx] = mk(bw, bh);[gcv, gctx] = mk(bw, bh);[glcv, glctx] = mk(bw, bh); wctx = ctx;
   const mkV = (r, g, b, k) => { const [c, vx] = mk(64, 36); const d = vx.createImageData(64, 36); for (let Y = 0; Y < 36; Y++) for (let X = 0; X < 64; X++) { const q = hypot((X - 31.5) / 32, (Y - 17.5) / 18), i = (Y * 64 + X) * 4; d.data[i] = r; d.data[i + 1] = g; d.data[i + 2] = b; d.data[i + 3] = 255 * clamp((q - .62) * k, 0, 1); } vx.putImageData(d, 0, 0); return c; };
@@ -162,7 +160,7 @@ function renderView(al) {
   const b = G.boss, tx0 = floor(cx / T) - 10, ty0 = floor(cy / T) - 10, tw = ceil(VS.vw / T) + 21, th = ceil(VS.vh / T) + 21;
   const kx0 = floor(cx / 256) - 1, kx1 = floor((cx + VS.vw) / 256) + 1, pods = [];
   RFRAME++;
-  if (!SETTINGS.fpsMode && (!perfLow || (G.time & 1) === 0)) {
+  if (!SETTINGS.fpsMode) {
     dynLights.length = 0;
     const lit = F.wardenDead || !!G.boss, v = G.duel, mirrorOn = F.vesperDone || !!v;
     for (const o of tileObjs.values()) {
@@ -225,7 +223,7 @@ function renderView(al) {
     else if (pr.type === 'cloud') { const r = pr.r * min(1, pr.t / 12) * min(1, (pr.life - pr.t) / 30 + .2); w.globalAlpha = .28; w.fillStyle = pr.col || '#6ff0c0'; w.beginPath(); w.arc(x, y, max(1, r), 0, TAU); w.fill(); w.globalAlpha = .45; w.beginPath(); w.arc(x + sin(G.time * .1 + pr.r) * 2, y, max(1, r * .55), 0, TAU); w.fill(); w.globalAlpha = 1; }
   }
   for (const q of G.stuck) w.drawImage(SPR.shuriken[0], round(q.x) - 2, round(q.y) - 2);
-  if (!SETTINGS.fpsMode && (!perfLow || (G.time & 1) === 0)) {
+  if (!SETTINGS.fpsMode) {
     lctx.setTransform(1, 0, 0, 1, 0, 0); lctx.globalCompositeOperation = 'copy'; lctx.imageSmoothingEnabled = true;
     lctx.drawImage(lmc, 0, 0, tw, th, tx0 * T - ax0, ty0 * T - ay0, tw * T, th * T);
     lctx.globalCompositeOperation = 'destination-in'; lctx.imageSmoothingEnabled = false; lctx.drawImage(acv, 0, 0);
@@ -245,7 +243,7 @@ function renderView(al) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawFG(cx, cy, ax0, ay0, offx, offy, tx0, ty0, tw, th, kx0, kx1);
   // ---------- emissive fx (low-res, additive) ----------
-  if (!SETTINGS.fpsMode && (!perfLow || (G.time & 1) === 0)) {
+  if (!SETTINGS.fpsMode) {
   const f = fctx, fx0 = floor(cx), fy0 = floor(cy); f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, fcv.width, fcv.height); f.setTransform(1, 0, 0, 1, -fx0, -fy0);
   const night = 1 - G.dn;
   for (let i = 0; i < pods.length; i += 3) { const X = pods[i], Y = pods[i + 1], k = pods[i + 2]; f.globalAlpha = .25 + .5 * night + .1 * sin(G.time * .05 + X); f.fillStyle = k === 1 ? '#4fd8c8' : k === 2 ? '#e2542b' : '#ffb347'; f.fillRect(X - 1, Y - 1, 3, 3); f.globalAlpha = 1; f.fillStyle = k === 1 ? '#c9fff6' : '#fff1a8'; f.fillRect(X, Y, 1, 1); }
@@ -365,7 +363,7 @@ function drawFG(cx, cy, ax0, ay0, offx, offy, tx0, ty0, tw, th, kx0, kx1) {
   }
   for (let k = kx0; k <= kx1; k++) { const bk = FGPB.get(k); if (bk) for (const q of bk) if (q.rf !== RFRAME && q.x < cx + VS.vw && q.x + q.img.width > cx && q.y < cy + VS.vh && q.y + q.img.height > cy) { q.rf = RFRAME; g.drawImage(q.img, q.x, q.y); any = true; } }
   if (!any) return;
-  if (!SETTINGS.fpsMode && (!perfLow || (G.time & 1) === 0)) {
+  if (!SETTINGS.fpsMode) {
     const l = glctx; l.setTransform(1, 0, 0, 1, 0, 0); l.globalCompositeOperation = 'copy'; l.imageSmoothingEnabled = true; l.drawImage(lmc, 0, 0, tw, th, tx0 * T - ax0, ty0 * T - ay0, tw * T, th * T); l.imageSmoothingEnabled = false; l.globalCompositeOperation = 'source-over';
     for (const st of uni) { lightSample(st.lx * T + 4, st.ly * T + 4, LIT2); l.fillStyle = `rgb(${min(255, LIT2[0] * 250) | 0},${min(255, LIT2[1] * 250) | 0},${min(255, LIT2[2] * 250) | 0})`; l.fillRect(st.px - ax0, st.py - ay0, st.fac.cv.width, st.fac.cv.height); }
     l.globalCompositeOperation = 'destination-in'; l.drawImage(gcv, 0, 0); l.globalCompositeOperation = 'source-over';
@@ -407,7 +405,7 @@ function ambient() {
 }
 function snapCam() { const p = G.p; G.cam.x = G.cam.px = camX(p.x + 3 - VS.vw / 2); G.cam.y = G.cam.py = camY(p.y + 4 - VS.vh / 2 - 8); }
 function tickCam() {
-  const c = G.cam, watchers = NET.spectating ? G.fighters.filter(f => f.remote && !f.dead) : [], p = watchers.length ? { x: watchers.reduce((n, f) => n + f.x, 0) / watchers.length, y: watchers.reduce((n, f) => n + f.y, 0) / watchers.length } : brCamTarget() || G.p; c.px = c.x; c.py = c.y;
+  const c = G.cam, p = brCamTarget() || G.p; c.px = c.x; c.py = c.y;
   const lx = (mouse.x / VS.s - VS.vw / 2) * .15, ly = (mouse.y / VS.s - VS.vh / 2) * .15, free = !UI.open && !G.dialog && !G.cine && !G.link;
   const spy = G.spy && free && !WORLD.arena && hasItem('spyglass') ? 1 : 0; if (G.spy && !spy && !hasItem('spyglass')) G.spy = false;
   let tx = p.x + 3 - VS.vw / 2 + (free ? lx * (1 + spy * 9) : 0), ty = p.y + 4 - VS.vh / 2 + (free ? ly * (1 + spy * 7) : 0) - (G.boss ? 22 : 8), k = spy ? .06 : .14;
@@ -447,36 +445,27 @@ function tick() {
   endTick();
 }
 function endTick() { G.shake *= .86; G.flash *= .88; for (const k in pressed) pressed[k] = false; mouse.lp = mouse.rp = mouse.hp = false; }
-let lastT = 0, acc = 0, perfLow = false, perfFrameMs = 16, perfFrameCount = 0, perfFrameSum = 0, perfRenderSkip = false, frameMsLast = 0;
+let lastT = 0, acc = 0;
 function frame(now) {
   // alone, a slow moment just slows the game; with friends here it must keep time, so it catches up
   const shared = netLive() || (BR.on && BR.via !== 'solo'), dt = min(shared ? .5 : .1, (now - lastT) / 1000 || 0); lastT = now; rafT = performance.now(); G.away = false;
-  const frameMs = frameMsLast ? max(1, now - frameMsLast) : 16;
-  frameMsLast = now;
-  perfFrameCount++; perfFrameSum += frameMs;
-  if (perfFrameCount >= 120) {
-    perfFrameMs = perfFrameSum / perfFrameCount;
-    perfLow = perfFrameMs > 25;
-    perfFrameCount = 0; perfFrameSum = 0;
-  }
   try { sigTick(); if (COOP.role) pingTick(rafT); coopRetryTick(rafT); netKeepAwake(!!(SIG.code || COOP.role || (BR.on && BR.via !== 'solo'))); } catch (e) { console.warn('net', e); }
   if (G.manual) { requestAnimationFrame(frame); return; }
   if (G.state === 'play' && (UI.open !== 'pause' || WORLD.arena || netLive())) {
     G.tscale += ((G.slowT > 0 ? .3 : 1) - G.tscale) * .25; acc += dt * 60 * G.tscale; let n = 0;
-    const most = shared ? (perfLow ? 18 : 30) : (perfLow ? 4 : 6);
+    const most = shared ? 30 : 6;
     while (acc >= 1 && n < most) { if (G.hitstop > 0) { G.hitstop--; tickParts(); G.shake *= .86; if (WORLD.arena && G.time % 3 === 0) netSend(); } else tick(); acc -= 1; n++; }
     if (n >= most) acc = 0;
   } else {
     G.time++; if (G.state !== 'play') { G.clock = (G.clock + 1 / 20000) % 1; } updateSun(); tickParts(); const c = G.cam; c.px = c.x; c.py = c.y;
     if (G.state !== 'play' && G.state !== 'intro') { c.x += .3; if (WORLD.endless) { streamTo(c.x + VS.vw / 2); if (c.x > (SPAWN_X + 600) * T) c.x = c.px = (SPAWN_X - 200) * T; } else if (c.x > WW * T - VS.vw - 2) c.x = c.px = 0; const hx = clamp(floor((c.x + VS.vw / 2) / T), 0, WW - 1); c.y += (camY(heights[hx] * T - VS.vh * .62) - c.y) * .02; c.x = camX(c.x); }
     if (G.state === 'intro') G.introT++;
-    if (BR.on && G.state === 'brlobby') brLobbyTick();
     if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
+    if (BR.on && G.state === 'brlobby') brLobbyTick();
     G.shake *= .86; G.flash *= .88; acc = 1;
     if (WORLD.arena && G.state === 'play' && G.time % 3 === 0) netSend();
   }
-  perfRenderSkip = perfLow ? !perfRenderSkip : false;
-  if (!perfRenderSkip || G.state !== 'play') render(G.hitstop > 0 || G.state !== 'play' ? 1 : clamp(acc, 0, 1));
+  render(G.hitstop > 0 || G.state !== 'play' ? 1 : clamp(acc, 0, 1));
   requestAnimationFrame(frame);
 }
 // ---------------- while the window is hidden ----------------
@@ -497,6 +486,7 @@ function bgStep() {
   } catch (e) { console.warn('bg', e); }
 }
 (function bgTimer() {
+  setInterval(bgStep, 250);
   try { const w = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},50)'], { type: 'text/javascript' }))); w.onmessage = bgStep; w.onerror = () => { }; } catch (e) { }
 })();
 function freshSession() {

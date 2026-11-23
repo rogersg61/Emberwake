@@ -8,7 +8,7 @@
 //  your screen really dodges). Nothing is stored; closing the page
 //  leaves the ring. Alone in a ring? Echoes spar with you instead.
 // ============================================================
-const NET = { room: null, roomReady: Promise.resolve(), R: null, transport: '', signalPeers: new Map(), sentAt: 0, status: 'off', code: 'open', me: '', peers: new Map(), queuePeers: new Map(), seen: new Map(), hitSeq: 0, shotSeq: 0, hits: [], shots: [], rd: 0, roundOver: 0, winner: '', deathN: 0, kb: ['', 0], unsubs: [], joinTok: 0, duelMode: '', duelMatch: '', duelPeer: '', duelQueueState: '', spectating: false, spectateRequest: false };
+const NET = { room: null, roomReady: Promise.resolve(), R: null, transport: '', signalPeers: new Map(), sentAt: 0, status: 'off', code: 'open', me: '', peers: new Map(), seen: new Map(), hitSeq: 0, shotSeq: 0, hits: [], shots: [], rd: 0, roundOver: 0, winner: '', deathN: 0, kb: ['', 0], unsubs: [], joinTok: 0 };
 const RING_WEAPONS = ['sword', 'spear', 'fangs', 'maul', 'bow', 'nunchaku'], ECHO_WEAPONS = ['sword', 'sword', 'spear', 'spear', 'fangs', 'fangs', 'maul', 'bow', 'nunchaku', 'nunchaku'], SHOT_TYPES = ['arrow', 'bomb', 'knife', 'javelin', 'wave', 'star', 'hook', 'flask', 'pellet'], ARM_SHOTS = ['star', 'hook', 'flask', 'pellet'];
 const KILLS_TO_WIN = 10, ECHO_NAMES = ['ECHO OF ASH', 'ECHO OF GLASS', 'ECHO OF RUST', 'ECHO OF DUSK', 'ECHO OF EMBER', 'ECHO OF MOSS'];
 const num = (v, d = 0) => typeof v === 'number' && isFinite(v) ? v : d;
@@ -25,7 +25,7 @@ async function netJoin(code) {
   const tok = ++NET.joinTok;
   NET.transport = ''; NET.signalPeers.clear();
   await NET.roomReady;
-  if (tok !== NET.joinTok || (!WORLD.arena && G.state !== 'duelQueue')) return;
+  if (tok !== NET.joinTok || !WORLD.arena) return;
   if (!NET.room) {
     NET.transport = 'signal'; NET.status = 'connecting';
     NET.me = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -36,7 +36,7 @@ async function netJoin(code) {
   NET.status = 'connecting';
   try {
     const R = await NET.room.join('ring-' + NET.code);
-    if (tok !== NET.joinTok || (!WORLD.arena && G.state !== 'duelQueue')) { try { R.leave(); } catch (e) { } return; }
+    if (tok !== NET.joinTok || !WORLD.arena) { try { R.leave(); } catch (e) { } return; }
     NET.R = R; NET.status = R.connected() ? 'online' : 'connecting';
     NET.unsubs.push(R.onPeers(ch => { if (NET.R === R) netPeers(ch.peers); }, () => { if (NET.R === R) NET.status = 'offline'; }));
     NET.unsubs.push(R.onConnection(c => { if (NET.R === R && NET.status !== 'offline') NET.status = c ? 'online' : 'connecting'; }, () => { if (NET.R === R) NET.status = 'offline'; }));
@@ -50,9 +50,8 @@ function netLeave() {
     sigStop();
   }
   if (NET.R) { try { NET.R.leave().catch(() => { }); } catch (e) { } } NET.R = null; NET.status = 'off';
-  NET.transport = ''; NET.signalPeers.clear(); NET.queuePeers.clear();
+  NET.transport = ''; NET.signalPeers.clear();
   for (const f of NET.peers.values()) f.gone = true; NET.peers.clear(); G.fighters = G.fighters.filter(f => !f.gone);
-  NET.duelMode = ''; NET.duelMatch = ''; NET.duelPeer = ''; NET.duelQueueState = ''; NET.spectating = false; NET.spectateRequest = false;
 }
 function netSignalMessage(m) {
   if (NET.transport !== 'signal' || !m || typeof m.g !== 'string' || m.g === NET.me || m.ring !== NET.code) return;
@@ -78,14 +77,10 @@ function netSignalRefresh(now) {
 function netPeers(list) {
   if (BR.on) return brPeers(list);
   const here = new Set();
-  NET.queuePeers.clear();
   for (const pe of list) {
     if (pe.isMe && pe.sameTab) { NET.me = pe.peer; continue; }
     if (pe.kind !== 'viewer') continue;
     const s = pe.presence; if (!s || s.v !== 1 || s.ring !== NET.code) continue;
-    if (NET.duelMode && s.qm === NET.duelMode && ['waiting', 'paired', 'playing', 'watching'].includes(s.q)) NET.queuePeers.set(pe.peer, s);
-    if (s.watch) continue;
-    if (NET.duelMode && (!NET.duelMatch || s.dm !== NET.duelMatch)) continue;
     here.add(pe.peer);
     let f = NET.peers.get(pe.peer);
     if (!f) {
@@ -153,8 +148,7 @@ function netPresence() {
     v: 1, ring: NET.code, n: G.nick, sk: G.skin, w: W && RING_WEAPONS.includes(W.id) ? W.id : 'sword', x: r1(p.x), y: r1(p.y), vx: r2(p.vx), vy: r2(p.vy), f: p.face, g: p.onGround ? 1 : 0,
     st: p.dead ? 4 : p.state === 'dodge' ? 2 : p.hurtT > 0 ? 3 : a ? 1 : 0, dd: p.dodgeDir, hp: max(0, round(p.hp)), k: p.kills, d: p.deaths, rd: NET.rd,
     m: a ? a.id : '', an: p.atkN, mp: a ? a.phase : 0, mt: a ? a.pt : 0, ma: a ? r2(a.aimA) : 0, md: a ? round(a.dist) : 0, mc: a ? a.charge : 0, mf: a ? a.face : p.face, rp: p.riposte > 0 ? 1 : 0, sp: p.inv > 30 ? 1 : 0,
-    hs: NET.hits, ps: NET.shots, kb: NET.kb, sx: p.st ? [p.st.pin > 0 ? (p.st.pinS || 0) + 2 : 0, p.st.burn > 0 ? 1 : 0, p.st.blind > 0 ? 1 : 0, p.st.hook > 0 || p.st.reel > 0 ? 1 : 0] : 0, lk: p.state === 'link' ? 1 : 0,
-    qm: NET.duelMode || '', q: NET.duelQueueState || '', dm: NET.duelMatch || '', dp: NET.duelPeer || '', watch: NET.spectating ? 1 : 0
+    hs: NET.hits, ps: NET.shots, kb: NET.kb, sx: p.st ? [p.st.pin > 0 ? (p.st.pinS || 0) + 2 : 0, p.st.burn > 0 ? 1 : 0, p.st.blind > 0 ? 1 : 0, p.st.hook > 0 || p.st.reel > 0 ? 1 : 0] : 0, lk: p.state === 'link' ? 1 : 0
   };
 }
 function netSend() {
@@ -199,73 +193,14 @@ function tickRemote(f) {
 }
 
 // ---------------- the arena itself ----------------
-function enterArena(nick, skin, code, duelMode = '', queued = false, spectating = false) {
-  if (BR.on) brLeave();
-  if (!queued) netLeave();
-  if (COOP.role) coopLeave();
-  WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0;
-  if (!queued) { genArena(); freshSession(); }
+function enterArena(nick, skin, code) {
+  if (BR.on) brLeave(); netLeave(); if (COOP.role) coopLeave(); WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0; genArena(); freshSession();
   G.nick = nick; G.skin = skin; NET.rd = 0; NET.roundOver = 0; NET.deathN = 0; NET.kb = ['', 0]; G.echoT = 60;
-  NET.duelMode = duelMode; NET.spectating = spectating; NET.duelQueueState = duelMode ? (spectating ? 'watching' : 'playing') : '';
   accountSaveProfile();
-  inv = new Array(INV_N).fill(null);
-  if (duelMode) inv[0] = { id: duelMode === 'bow' ? 'bow' : 'sword', n: 1 };
-  else RING_WEAPONS.forEach((id, i) => inv[i] = { id, n: 1 });
-  G.p = newPlayer(); G.p.duelRange = 0; G.fighters = []; G.npcs = []; G.clock = .57;
-  if (spectating) { G.p.dead = true; G.p.deadT = 100; }
-  else { G.fighters = [G.p]; arenaRespawn(G.p); G.p.inv = 60; }
-  snapCam(); G.state = 'play'; G.banner = { text: spectating ? 'SPECTATING' : 'DUEL MATCH', sub: duelMode ? duelMode.toUpperCase() + ' DUEL' : NET.room ? 'queue: ' + (code || 'duel') : 'practice with the echoes', t: 0 };
-  if (!queued) netJoin(code || 'open');
-}
-function enterDuelQueue(mode, nick, skin, spectate = false) {
-  netLeave(); if (COOP.role) coopLeave(); WORLD.guest = false; WORLD.id = ''; WORLD.mode = 0; genArena(); freshSession();
-  G.nick = nick; G.skin = skin; NET.duelMode = mode; NET.duelQueueState = spectate ? 'spectate' : 'waiting'; NET.spectateRequest = spectate;
-  NET.duelMatch = ''; NET.duelPeer = ''; NET.spectating = false; NET.queuePeers.clear();
-  accountSaveProfile(); inv = new Array(INV_N).fill(null); inv[0] = { id: mode === 'bow' ? 'bow' : 'sword', n: 1 };
-  G.p = newPlayer(); G.fighters = []; G.npcs = []; G.state = 'duelQueue'; G.banner = null;
-  netJoin('duel-' + mode);
-}
-function duelPairId(a, b) {
-  let h = 2166136261;
-  for (const ch of [a, b].sort().join('|')) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-  return NET.duelMode + '-' + (h >>> 0).toString(36);
-}
-function duelQueueTick() {
-  if (G.state !== 'duelQueue' || !NET.duelMode) return;
-  if (NET.spectateRequest) {
-    const active = [...NET.queuePeers.entries()].filter(([, p]) => p.q === 'playing' && p.dm).sort((a, b) => a[1].dm.localeCompare(b[1].dm));
-    if (active.length) {
-      NET.duelMatch = active[0][1].dm; NET.duelPeer = ''; NET.spectating = true; NET.spectateRequest = false;
-      enterArena(G.nick, G.skin, NET.code, NET.duelMode, true, true); return;
-    }
-    netSend(); return;
-  }
-  if (NET.duelQueueState === 'waiting' && NET.me) {
-    const partner = [...NET.queuePeers.entries()].find(([id, p]) => p.q === 'paired' && p.dp === NET.me && p.dm);
-    if (partner) { NET.duelPeer = partner[0]; NET.duelMatch = partner[1].dm; NET.duelQueueState = 'paired'; }
-    else {
-      const waiting = [NET.me, ...[...NET.queuePeers].filter(([, p]) => p.q === 'waiting').map(([id]) => id)].sort();
-      const i = waiting.indexOf(NET.me);
-      if (i >= 0 && i % 2 === 0 && waiting[i + 1]) {
-        NET.duelPeer = waiting[i + 1]; NET.duelMatch = duelPairId(NET.me, NET.duelPeer); NET.duelQueueState = 'paired';
-      } else if (i > 0 && i % 2 === 1) {
-        NET.duelPeer = waiting[i - 1]; NET.duelMatch = duelPairId(NET.me, NET.duelPeer); NET.duelQueueState = 'paired';
-      }
-    }
-  }
-  if (NET.duelQueueState === 'paired') {
-    const partner = NET.queuePeers.get(NET.duelPeer);
-    if (partner && partner.dm === NET.duelMatch && partner.dp === NET.me && ['paired', 'playing'].includes(partner.q)) {
-      const mode = NET.duelMode, match = NET.duelMatch;
-      enterArena(G.nick, G.skin, NET.code, mode, true, false);
-      NET.duelMatch = match; NET.duelQueueState = 'playing';
-      netSend(); return;
-    }
-  }
-  netSend();
-}
-function cancelDuelQueue() {
-  netLeave(); WORLD.arena = false; G.state = 'ring'; G.fighters = []; UI.focus = null;
+  inv = new Array(INV_N).fill(null); RING_WEAPONS.forEach((id, i) => inv[i] = { id, n: 1 });
+  G.p = newPlayer(); G.fighters = [G.p]; G.npcs = []; G.clock = .57; arenaRespawn(G.p); G.p.inv = 60;
+  snapCam(); G.state = 'play'; G.banner = { text: 'DUEL MATCH', sub: NET.room ? 'queue: ' + (code || 'duel') : 'practice with the echoes', t: 0 };
+  netJoin(code || 'open');
 }
 function arenaRespawn(f) {
   let best = ARENA_SPAWNS[0], bd = -1;
@@ -298,11 +233,6 @@ function resetRound() {
 }
 function arenaTick() {
   if (WORLD.royale) return brTick();
-  if (NET.spectating) {
-    const live = G.fighters.filter(f => f.remote && !f.dead);
-    if (live.length) { const x = live.reduce((n, f) => n + f.x, 0) / live.length, y = live.reduce((n, f) => n + f.y, 0) / live.length; G.cam.x = camX(x - VS.vw / 2); G.cam.y = camY(y - VS.vh / 2); }
-  }
-  if (NET.duelMode) { if (G.time % 3 === 0) netSend(); return; }
   const humans = NET.peers.size, echoes = G.fighters.filter(f => f.echoBot);
   if (humans === 0) { if (echoes.length < 3 && --G.echoT <= 0) { spawnEcho(); G.echoT = 100; } }
   else if (echoes.length) { const e = echoes[0]; e.gone = true; burst(e.x + 3, e.y + 10, 30, SPARK, 2.6, 40, { glow: 1 }); G.fighters = G.fighters.filter(f => !f.gone); if (echoes.length === 1) say('Another Waker has entered the ring. The echoes step aside.'); }
