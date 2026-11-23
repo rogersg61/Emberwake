@@ -9055,8 +9055,9 @@ function button(c, x, y, w, h, label, fn, o = {}) {
 function field(c, x, y, w, key, ph) {
   const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
-  if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
-  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
+  const display = v ? fitText(v, w - 8) : fitText(ph, w - 8);
+  drawText(c, display, x + 4, y + 4, v ? '#fff' : '#6a6485');
+  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(min(x + w - 5, x + 5 + textW(display)), y + 3, 1, 8); }
   hit(x, y, w, 14, () => { UI.focus = key; sfx('ui'); });
 }
 function chooser(c, x, y, w, label, names, key, descs) {
@@ -10655,7 +10656,16 @@ function brFlat(x0, x1, gy, b) {
 // a ramp of earth so the ground beside a flattened place stays walkable
 function brEase(x, dir, gy) { for (let k = 1; k < 30; k++) { const xx = x + dir * k; if (xx < 3 || xx > BRW - 4) return; const want = gy + sign(heights[xx] - gy) * min(abs(heights[xx] - gy), k * 2); if (want === heights[xx]) return; brFlat(xx, xx, want); } }
 function brChest(x, y, rare, o = {}) {
-  if (!inW(x, y) || tiles[y * WW + x] !== AIR || !TP[tileAt(x, y + 1)].solid && tileAt(x, y + 1) !== PLATFORM) return null;
+  x = floor(x); y = floor(y);
+  if (!inW(x, y)) return null;
+  let placed = false;
+  for (let dy = -6; dy <= 6 && !placed; dy++) {
+    const cy = y + dy;
+    if (!inW(x, cy) || tiles[cy * WW + x] !== AIR) continue;
+    const below = tileAt(x, cy + 1);
+    if (TP[below].solid || below === PLATFORM) { y = cy; placed = true; }
+  }
+  if (!placed) return null;
   for (const c of BR.chests) if (abs(c.x - x) < 3 && abs(c.y - y) < 3) return null;
   const c = { i: BR.chests.length, x, y, rare: !!rare, cave: !!o.cave, high: !!o.high, open: false, t: 0 }; BR.chests.push(c); return c;
 }
