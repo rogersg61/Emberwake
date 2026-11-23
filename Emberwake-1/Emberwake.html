@@ -5787,24 +5787,72 @@ function duelAimPoint(f, W, x, y) {
 function startAttack(f, btn, I, force) {
   const W = heldOf(f); if (!W || W.type !== 'weapon') return false;
   const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode;
+  if (!duel && f.isPlayer && (f.snapped || 0) > 0) {
+    sfx('deny');
+    if (f === G.p) numPop(f.x + 3, f.y - 12, 'SNAPPED', '#e2483b', .8);
+    f.stamDelay = 18;
+    return false;
+  }
   if (!duel && !force && tryLink(f, btn)) return true;
   const set = MOVESETS[W.set], c = atkContext(f, I); let id = duel ? 'duel_strike' : force || resolveMove(set, btn, c); if (!duel && !force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
   if (duel) m = Object.assign({}, m, { reach: duelWeaponRange(f, W) / max(1, ARM + W.len) });
-  if (force) { if (m.cost) { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
+  if (f.isPlayer && !duel) {
+    if (f.paceRepeat === id) f.paceRepeatN = min(6, (f.paceRepeatN || 0) + 1);
+    else { f.paceRepeat = id; f.paceRepeatN = 1; }
+    f.paceRepeatT = 120;
+  }
+  if (f.isPlayer && !duel) {
+    if (f.lastMove === id) {
+      f.dissonance = min(100, (f.dissonance || 0) + 7);
+      f.fray = min(100, (f.fray || 0) + 5);
+    } else {
+      f.dissonance = max(0, (f.dissonance || 0) - 3);
+    }
+    if (btn === 'L') {
+      f.stam = max(0, f.stam - 2);
+      f.stamDelay = max(f.stamDelay || 0, 18);
+    }
+  }
+  if (force) { if (m.cost) { const fray = f.isPlayer ? (f.fray || 0) : 0, rush = (f.atkTiming || 'normal') === 'rushed'; const cost = round(m.cost * (1 + (fray >= 70 ? .5 : fray >= 40 ? .25 : 0) + (rush ? .35 : 0))); f.stam = max(0, f.stam - cost); f.stamDelay = 42; } }
   else if (m.rise && c.air) { if (!f.updraft) { id = btn === 'L' ? set.map.aChain[0] : set.map.ha; m = set.moves[id]; } else f.updraft = false; }
-  if (!force && m.cost) { if (f.stam < m.cost * .6) { if (f === G.p) sfx('deny'); id = resolveMove(set, 'L', c); if (f === G.p) id = famGate(W.set, set, id, 'L', c); m = set.moves[id]; if (m.rise && c.air) { id = set.map.aChain[0]; m = set.moves[id]; } } else { f.stam = max(0, f.stam - m.cost); f.stamDelay = 42; } }
+  if (!force && m.cost) {
+    if (f.stam < m.cost * .6) { if (f === G.p) sfx('deny'); id = resolveMove(set, 'L', c); if (f === G.p) id = famGate(W.set, set, id, 'L', c); m = set.moves[id]; if (m.rise && c.air) { id = set.map.aChain[0]; m = set.moves[id]; } }
+    else { const fray = f.isPlayer ? (f.fray || 0) : 0, rush = (f.atkTiming || 'normal') === 'rushed'; const cost = round(m.cost * (1 + (fray >= 70 ? .5 : fray >= 40 ? .25 : 0) + (rush ? .35 : 0))); f.stam = max(0, f.stam - cost); f.stamDelay = 42; }
+  }
   const rep = duel ? 0 : f.hist.slice(-4).filter(h => h === id).length, fresh = duel || !f.hist.slice(-3).includes(id);
   f.hist.push(id); if (f.hist.length > 8) f.hist.shift();
   f.face = c.side; f.state = 'attack'; f.chainT = 0; f.mineP = 0;
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
+  if (f.isPlayer) {
+    f.beatStance = f.lastBeatBtn && f.lastBeatBtn !== btn ? 'FLOW' : f.lastBeatBtn === btn ? 'STRAIN' : 'OPEN';
+    f.beatStanceT = 180;
+  }
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
+  if (f.isPlayer && !duel) {
+    const paceBase = max(10, round((m.wind + m.act + m.rec) * (m.big ? .24 : .18)));
+    f.paceLock = paceBase + (f.paceRepeatN > 2 ? min(12, f.paceRepeatN * 3) : 0) + (f.paceDebt > 40 ? 8 : 0);
+  }
   if (duel) { a.duelRange = duelWeaponRange(f, W); f.duelCooldown = 20; }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
-  const timingMul = timing === 'perfect' ? 1.28 : timing === 'rushed' ? .72 : timing === 'steady' ? 1.1 : 1;
-  a.gm = (a.gm || 1) * timingMul;
+  const timingMul = timing === 'perfect' ? 1.38 : timing === 'rushed' ? .58 : timing === 'steady' ? 1.16 : 1;
+  const tempoTier = f.isPlayer ? ((f.tempo || 0) >= 100 ? 3 : (f.tempo || 0) >= 65 ? 2 : (f.tempo || 0) >= 35 ? 1 : 0) : 0;
+  const tempoMul = f.isPlayer ? [1, 1.04, 1.1, 1.18][tempoTier] : 1;
+  const snappedMul = f.isPlayer && f.snapped > 0 ? .62 : 1;
+  a.gm = (a.gm || 1) * timingMul * tempoMul * snappedMul;
+  if (f.isPlayer && f.phraseSurge) {
+    const surge = f.phraseSurge;
+    if (surge.effect === 'burst') a.gm *= 1.35;
+    else if (surge.effect === 'lift') { a.crit = true; a.gm *= 1.18; m.launch = 1; }
+    else if (surge.effect === 'crush') { a.gm *= 1.28; m = Object.assign({}, m, { flow: 'down', stagger: max(m.stagger || 0, 60) }); a.m = m; }
+    else if (surge.effect === 'guard') f.iDodge = max(f.iDodge, 18);
+    else if (surge.effect === 'rally') { f.hp = min(f.maxhp, f.hp + max(2, round(f.maxhp * .03))); f.stam = min(f.maxstam, f.stam + 20); }
+    else if (surge.effect === 'echo') { a.echo = 1; a.gm *= 1.12; }
+    numPop(f.x + 3, f.y - 14, surge.effect.toUpperCase(), '#8ff5e6', .8);
+    f.phraseSurge = null;
+  }
   if (!force && f === G.p && btn === 'H' && id === set.map.h) { const art = artFor(W); if (art) a.artCharge = { min: 26, max: 96, into: art }; }
   setAim(a);
   if (c.riposte) { f.riposte = 0; if (f === G.p) G.slowT = min(G.slowT, 8); }
@@ -5859,6 +5907,10 @@ function tickAttack(f, I) {
 }
 function beginActive(a) {
   const f = a.f, m = a.m, fc = a.face;
+  if (WORLD.arena && !WORLD.royale && NET.duelMode) {
+    a.duelDamageMul = !f.onGround && f.vy > 1.2 ? 1.25 : 1;
+    a.duelSprint = hypot(f.vx, f.vy) > 1.2;
+  }
   if (m.plant) f.vx = fc * max(m.step || 0, min(f.vx * fc, .9));
   else if (m.step) f.vx = fc * max(m.step, f.vx * fc);
   if (m.back) f.vx = -fc * m.back;
@@ -5895,7 +5947,8 @@ function fireArrows(a, count) {
     let vx, vy, g = A.g === undefined ? .05 : A.g;
     if (A.rain) { const tx = a.tx + (A.n > 1 ? (a.shotI - (A.n - 1) / 2) * 10 : 0) + frand(-3, 3), Tf = A.tf || 46; g = .16; vx = clamp((tx - sx) / Tf, -7, 7); vy = (a.ty - sy - .5 * g * Tf * Tf) / Tf; }
     else { const v = A.v || 6.5; if (A.radial) { const th = a.shotI / A.n * TAU; vx = cos(th) * v; vy = sin(th) * v; } else { const th = a.th + (A.spread ? (a.shotI - (A.n - 1) / 2) * A.spread : 0) + (A.burst ? frand(-.025, .025) : 0); vx = fc * cos(th) * v; vy = sin(th) * v; } }
-    spawnProj({ type: A.boom ? 'bomb' : 'arrow', owner: f, x: sx, y: sy, vx, vy, g, r: 3, dmg: max(1, round(a.W.dmg * m.dmg * a.stale * (f.dmgMul || 1))), pierce: !!A.pierce, boom: A.boom || 0, life: 190, kb: [m.kb[0], m.kb[1]], crit: a.crit, stagger: m.stagger, stop: m.stop });
+    const duel = WORLD.arena && !WORLD.royale && NET.duelMode, kick = duel && a.duelSprint;
+    spawnProj({ type: A.boom ? 'bomb' : 'arrow', owner: f, x: sx, y: sy, vx, vy, g, r: 3, dmg: max(1, round(a.W.dmg * m.dmg * a.stale * (f.dmgMul || 1) * (duel ? a.duelDamageMul || 1 : 1))), pierce: !!A.pierce, boom: A.boom || 0, life: duel ? clamp(round((a.duelRange || 165) / max(1, A.v || 6.5)), 12, 190) : 190, kb: kick ? [5.2, -1.8] : m.kb, crit: a.crit, stagger: m.stagger, stop: m.stop });
   }
   fsx(f, 'bolt', 0); fsx(f, 'thrust', 0);
 }
@@ -5942,6 +5995,166 @@ function reflectProj(pr, a) {
   fsx(a.f, 'reflect'); sparks(pr.x, pr.y, 10); numPop(pr.x, pr.y - 6, 'DEFLECT', '#8ff5e6'); if (a.f === G.p) { G.hitstop = max(G.hitstop, 3); comboHit(true); }
 }
 function comboHit(fresh) { const c = G.combo; c.n++; c.t = 180; c.pts += fresh ? 3 : 1; }
+const COMBAT_PHRASES = {
+  sword: [
+    { name: 'Kindled Arc', pattern: ['L', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Red Hook', pattern: ['L', 'H', 'L'], effect: 'lift', desc: 'opens with an airborne finisher' },
+    { name: 'Ash Cross', pattern: ['H', 'L', 'L', 'H'], effect: 'crush', desc: 'finishes with crushing force' },
+    { name: 'Glass Answer', pattern: ['L', 'H', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Ember Wheel', pattern: ['L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Sundered Dawn', pattern: ['H', 'H', 'L', 'H'], effect: 'echo', desc: 'next heavy repeats a shadow edge' }
+  ],
+  spear: [
+    { name: 'Pike Rain', pattern: ['L', 'H', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Heron Step', pattern: ['L', 'L', 'H'], effect: 'lift', desc: 'launches the next target' },
+    { name: 'Wind Spear', pattern: ['H', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Fence and Fall', pattern: ['L', 'H', 'H', 'L'], effect: 'crush', desc: 'heavy follow-up crushes open foes' },
+    { name: 'Turning Point', pattern: ['H', 'L', 'L', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Thousand Paces', pattern: ['L', 'L', 'L', 'H', 'L'], effect: 'echo', desc: 'next thrust echoes once' }
+  ],
+  fangs: [
+    { name: 'Twin Bite', pattern: ['L', 'L', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Viper Coil', pattern: ['L', 'H', 'L', 'L'], effect: 'lift', desc: 'launches the next target' },
+    { name: 'Red Needle', pattern: ['H', 'L', 'L', 'H'], effect: 'echo', desc: 'next light strike repeats once' },
+    { name: 'Shadow Reel', pattern: ['L', 'L', 'H', 'L', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Wild Hunger', pattern: ['H', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Heartseeker', pattern: ['L', 'H', 'L', 'H', 'H'], effect: 'crush', desc: 'heavy follow-up crushes open foes' }
+  ],
+  maul: [
+    { name: 'Bell Toll', pattern: ['H', 'L', 'H'], effect: 'crush', desc: 'heavy follow-up crushes open foes' },
+    { name: 'Mountain Roll', pattern: ['L', 'H', 'H', 'L'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Hearthfall', pattern: ['H', 'H', 'L'], effect: 'echo', desc: 'next heavy repeats a shadow edge' },
+    { name: 'Stone Kneel', pattern: ['L', 'L', 'H', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Worldbeat', pattern: ['H', 'L', 'L', 'H', 'H'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Ruin Meter', pattern: ['L', 'H', 'L', 'H', 'H'], effect: 'lift', desc: 'launches the next target' }
+  ],
+  bow: [
+    { name: 'Quick Pair', pattern: ['L', 'H', 'L'], effect: 'burst', desc: 'next shot surges with 35% force' },
+    { name: 'Running Cadence', pattern: ['L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'High Flight', pattern: ['H', 'L', 'H'], effect: 'lift', desc: 'next volley lifts airborne foes' },
+    { name: 'Arrow Hush', pattern: ['L', 'H', 'H', 'L'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Branch Storm', pattern: ['H', 'L', 'L', 'H', 'L'], effect: 'echo', desc: 'next shot repeats once' },
+    { name: 'Stars and Ash', pattern: ['L', 'H', 'L', 'H', 'H'], effect: 'crush', desc: 'finishes with crushing force' }
+  ],
+  chuks: [
+    { name: 'Figure Eight', pattern: ['L', 'L', 'H'], effect: 'echo', desc: 'next light strike repeats once' },
+    { name: 'Dragon Coil', pattern: ['L', 'H', 'L', 'H'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Bell Chain', pattern: ['H', 'L', 'L', 'H'], effect: 'crush', desc: 'finishes with crushing force' },
+    { name: 'Rebound', pattern: ['L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'Rattlestorm', pattern: ['H', 'H', 'L', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Ghost Wheel', pattern: ['L', 'H', 'H', 'L', 'H'], effect: 'lift', desc: 'launches the next target' }
+  ],
+  brawl: [
+    { name: 'Fist Rhythm', pattern: ['L', 'H', 'L', 'H'], effect: 'burst', desc: 'next strike surges with 35% force' },
+    { name: 'Heel and Knuckle', pattern: ['L', 'L', 'H'], effect: 'crush', desc: 'finishes with crushing force' },
+    { name: 'Counterbeat', pattern: ['H', 'L', 'H', 'L'], effect: 'guard', desc: 'grants a brief counter window' },
+    { name: 'Uppercut Spree', pattern: ['L', 'H', 'H', 'L'], effect: 'lift', desc: 'launches the next target' },
+    { name: 'Second Wind', pattern: ['H', 'L', 'L', 'H', 'L'], effect: 'rally', desc: 'restores tempo stamina' },
+    { name: 'No Rest', pattern: ['L', 'L', 'H', 'L', 'H'], effect: 'echo', desc: 'next strike repeats once' }
+  ]
+};
+function advancePhraseBranch(f, setName, btn) {
+  const phrases = COMBAT_PHRASES[setName] || COMBAT_PHRASES.sword;
+  const seq = ((f.cadenceSeq || '') + btn).slice(-8);
+  let candidates = phrases.map((p, i) => ({ p, i })).filter(q => q.p.pattern.join('').startsWith(seq));
+  if (candidates.length) {
+    const exact = candidates.filter(q => q.p.pattern.join('') === seq);
+    const longer = candidates.filter(q => q.p.pattern.length > seq.length);
+    if (exact.length && !longer.length) {
+      const done = exact[0];
+      f.cadenceIndex = done.i;
+      f.cadenceStep = 0;
+      f.cadenceSeq = '';
+      f.cadenceT = 180;
+      f.dissonance = max(0, (f.dissonance || 0) - 12);
+      return { complete: done.p };
+    }
+    const current = phrases[f.cadenceIndex || 0];
+    const curKey = current ? current.pattern.join('') : '';
+    const same = candidates.find(q => q.i === (f.cadenceIndex || 0) && curKey.startsWith(seq));
+    const next = same || candidates[0];
+    f.cadenceIndex = next.i;
+    f.cadenceStep = seq.length;
+    f.cadenceSeq = seq;
+    f.cadenceT = 180;
+    f.dissonance = max(0, (f.dissonance || 0) - 8);
+    return { complete: null, phrase: next.p };
+  }
+  const retry = btn;
+  candidates = phrases.map((p, i) => ({ p, i })).filter(q => q.p.pattern[0] === retry);
+  if (candidates.length) {
+    f.cadenceIndex = candidates[0].i;
+    f.cadenceStep = 1;
+    f.cadenceSeq = retry;
+    f.cadenceT = 180;
+    f.dissonance = max(0, (f.dissonance || 0) - 3);
+    return { complete: null, phrase: candidates[0].p };
+  }
+  f.cadenceStep = 0;
+  f.cadenceSeq = '';
+  f.cadenceT = 180;
+  f.dissonance = min(100, (f.dissonance || 0) + 24);
+  f.fray = min(100, (f.fray || 0) + 12);
+  return { complete: null, dissonant: true };
+}
+function combatTempoHit(f, a, e) {
+  if (!f.isPlayer || f.snapped > 0) return;
+  const timing = a.timing || 'normal';
+  const previousBeat = f.lastBeatBtn || '';
+  f.lastBeatBtn = a.btn;
+  if (f.repeatMove === a.id && f.tempoT > 0) f.repeatCount = min(5, (f.repeatCount || 0) + 1);
+  else { f.repeatMove = a.id; f.repeatCount = 1; }
+  f.tempoT = 150;
+  const branch = advancePhraseBranch(f, a.setName, a.btn);
+  if (previousBeat && previousBeat !== a.btn) {
+    f.fray = max(0, f.fray - 7);
+    f.dissonance = max(0, f.dissonance - 7);
+    f.beatStance = 'FLOW';
+    f.beatStanceT = 180;
+  } else if (previousBeat === a.btn) {
+    f.fray = min(100, f.fray + 10);
+    f.dissonance = min(100, f.dissonance + 6);
+    f.beatStance = 'STRAIN';
+    f.beatStanceT = 180;
+  }
+  if (branch.complete) {
+    const phrase = branch.complete;
+    f.cadencePhrase = (f.cadencePhrase || 0) + 1;
+    f.tempo = min(100, (f.tempo || 0) + 30);
+    f.fray = max(0, (f.fray || 0) - 28);
+    f.dissonance = max(0, (f.dissonance || 0) - 45);
+    f.stam = min(f.maxstam, f.stam + 8);
+    f.phraseSurge = { name: phrase.name, effect: phrase.effect, t: 180 };
+    numPop(f.x + 3, f.y - 18, phrase.name.toUpperCase(), '#ffd35a', .9);
+    sparks(f.x + 3, f.y + 6, 12, f.face, 2.2, ['#ffd35a', '#fff1a8', '#8ff5e6']);
+    sfx('newmove', 0);
+  }
+  if (timing === 'rushed') {
+    f.fray = min(100, (f.fray || 0) + 24);
+    f.tempo = max(0, (f.tempo || 0) - 8);
+  } else if (timing === 'perfect') {
+    f.fray = max(0, (f.fray || 0) - 18);
+    f.tempo = min(100, (f.tempo || 0) + 28);
+  } else if (timing === 'steady') {
+    f.fray = max(0, (f.fray || 0) - 12);
+    f.tempo = min(100, (f.tempo || 0) + 18);
+  } else {
+    f.fray = max(0, (f.fray || 0) - 4);
+    f.tempo = min(100, (f.tempo || 0) + 9);
+  }
+  if (f.repeatCount >= 2) {
+    f.fray = min(100, (f.fray || 0) + 12 * (f.repeatCount - 1));
+    f.tempo = max(0, (f.tempo || 0) - 5 * (f.repeatCount - 1));
+  }
+  if (f.fray >= 100 || (f.dissonance || 0) >= 100) {
+    f.fray = 100; f.dissonance = 100; f.tempo = max(0, f.tempo - 35); f.snapped = 120;
+    f.stam = max(0, f.stam - 18); f.stamDelay = 70;
+    numPop(f.x + 3, f.y - 14, 'TEMPO SNAPPED', '#e2483b', .9);
+    sparks(f.x + 3, f.y + 8, 16, f.face, 2.2, ['#e2483b', '#ff9a8a', '#ffd35a']);
+    sfx('deny', 0);
+  }
+  if (f.tempo >= 100 && !e.dead) f.stam = min(f.maxstam, f.stam + 2);
+}
 function hitFx(hx, hy, top, dmg, o, kx, involved) {
   numPop(hx, top - 4, dmg, o.crit ? '#ffd35a' : '#ffffff', o.crit ? 2 : 1); sparks(hx, hy, o.crit ? 12 : 6, sign(kx), 2.4, o.cold ? FROST : SPARK); if (o.blunt) dust(hx, hy, 4);
   G.trails.push({ kind: 'hit', x: hx, y: hy, life: 5, max: 5, a: frand(TAU), big: o.crit || o.stop >= 5 });
@@ -5963,15 +6176,31 @@ function applyHit(a, e, hx, hy) {
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
   const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
   const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
+<<<<<<< HEAD
   const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode, falling = duel && !f.onGround && f.vy > 1.2, sprint = duel && hypot(f.vx, f.vy) > 1.2;
   let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1) * (falling ? 1.25 : 1);
   const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
+=======
+  const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode, falling = duel && !f.onGround && f.vy > 1.2, sprint = duel && abs(f.vx) > 1.2;
+  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1) * (falling ? 1.25 : 1);
+  if (P0 && !duel) {
+    const repeated = (f.paceRepeat === a.id ? (f.paceRepeatN || 1) : 1);
+    if (repeated >= 3) dmg *= max(.45, 1 - (repeated - 2) * .14);
+  }
+  const lk = P0 && !duel ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
+>>>>>>> ecc0a0f (changes)
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face, ky = m.kb[1];
   if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
   if (duel) { kx = sprint ? 5.2 * a.face : .6 * a.face; ky = sprint ? -1.8 : -.25; }
   if (!strike(f, e, dmg, kx, ky, { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
+<<<<<<< HEAD
   if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
+=======
+  if (a.echo) { a.echo = 0; strike(f, e, max(1, round(dmg * .45)), kx * .6, m.kb[1] * .5, { stagger: 12, crit: false, stop: 2, blunt: m.blunt, cold: a.W.cold, hx, hy }); }
+  if (P0) combatTempoHit(f, a, e);
+  if (P0 && !duel) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
+>>>>>>> ecc0a0f (changes)
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }
   if (a.W.steal && f.hp < f.maxhp) { f.hp = min(f.maxhp, f.hp + max(1, round(dmg * a.W.steal))); }
@@ -6907,7 +7136,11 @@ function newFighter(x, y, o) {
     inv: 0, iDodge: 0, dodgeT: 0, dodgeCd: 0, dodgeDir: 1, dodgeGrace: 0, dodgeGround: true, dbuf: 0, airDash: 1, updraft: true, dblUsed: false, perfected: false,
     state: 'normal', atk: null, buf: null, coyote: 0, jbuf: 0, runPh: 0, landT: 0, hurtT: 0, riposte: 0, lastMove: null, chainT: 0, hist: [], toolT: 0, mineX: -1, mineY: -1, mineP: 0,
     placeCd: 0, dead: false, deadT: 0, healCd: 0, regenT: 0, sHold: 0, noCut: false, ghostReq: false, scarf: [], skin: 0, hat: 0, team: 'p', name: '', wid: 'sword', flash: 0, taken: 0, takenT: 0,
-    kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal'
+    kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
+    tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
+    cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
+    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0,
+    beatStance: 'OPEN', beatStanceT: 0, pressure: 0, lastBeatBtn: '', cadenceSet: ''
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -6979,6 +7212,25 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.paceLock > 0) f.paceLock--;
+  if (f.paceDebt > 0) f.paceDebt = max(0, f.paceDebt - .35);
+  if (f.beatStanceT > 0) f.beatStanceT--;
+  else f.beatStance = 'OPEN';
+  if (f.paceRepeatT > 0) f.paceRepeatT--;
+  else if (f.paceRepeatN > 0) { f.paceRepeatN = 0; f.paceRepeat = ''; }
+  if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
+  if (f.snapped > 0) f.snapped--;
+  if (f.tempoT > 0) f.tempoT--;
+  if (f.tempoT <= 0) f.tempo = max(0, (f.tempo || 0) - .12);
+  f.fray = max(0, (f.fray || 0) - (f.snapped > 0 ? .12 : .38));
+  f.dissonance = max(0, (f.dissonance || 0) - (f.snapped > 0 ? .08 : .28));
+  f.pressure = clamp(max(f.fray || 0, f.dissonance || 0, f.paceDebt || 0), 0, 100);
+  if (f.cadenceT > 0) f.cadenceT--;
+  else if (f.cadenceStep > 0) {
+    f.cadenceStep = 0;
+    f.cadenceSeq = '';
+    f.dissonance = min(100, (f.dissonance || 0) + 10);
+  }
   if (f.dead) { f.deadT++; f.vy = min(f.vy + .26, 6); f.vx *= .9; moveBody(f); if (f.hollow && f.deadT > 50) f.gone = true; return; }
   if (f.inv > 0) f.inv--; if (f.iDodge > 0) f.iDodge--; if (f.dodgeCd > 0) f.dodgeCd--; if (f.dodgeGrace > 0) f.dodgeGrace--; if (f.riposte > 0) f.riposte--;
   if (f.attackInputCd > 0) f.attackInputCd--; if (f.duelCooldown > 0) f.duelCooldown--;
@@ -6999,19 +7251,30 @@ function tickFighter(f, I) {
   if (isW && free) {
     if (I.lp || I.rp) {
       const b = I.lp ? 'L' : 'H';
+      if (f.paceLock > 0 && !(WORLD.arena && !WORLD.royale && NET.duelMode)) {
+        f.fray = min(100, (f.fray || 0) + 3);
+        f.dissonance = min(100, (f.dissonance || 0) + 5);
+        f.paceDebt = min(100, (f.paceDebt || 0) + 7);
+        f.attackInputCd = 4;
+        if (f === G.p && G.time % 12 === 0) numPop(f.x + 3, f.y - 12, 'COMMIT', '#ff8a3d', .7);
+      } else
       if (f.attackInputCd <= 0 && (!(WORLD.arena && !WORLD.royale && NET.duelMode) || f.duelCooldown <= 0)) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
           const rec = max(1, round(f.atk.m.rec * (f.atk.tm || f.atk.W.wsp || 1)));
           const prog = clamp(f.atk.pt / rec, 0, 1);
+          const set = f.atk.W.set;
+          const window = set === 'maul' ? [.70, .84] : set === 'fangs' ? [.74, .94] : set === 'bow' ? [.80, .96] : set === 'chuks' ? [.76, .92] : [.78, .92];
           if (prog >= .68) {
-            f.atkTiming = prog >= .78 && prog <= .92 ? 'perfect' : 'steady';
+            f.atkTiming = prog >= window[0] && prog <= window[1] ? 'perfect' : 'steady';
             f.buf = { b, t: 10 };
             f.attackInputCd = 8;
             if (f === G.p) numPop(f.x + 3, f.y - 12, f.atkTiming === 'perfect' ? 'PERFECT' : 'TIMED', f.atkTiming === 'perfect' ? '#ffd35a' : '#7ddc6f');
           } else {
             f.atkTiming = 'rushed';
             f.attackInputCd = 18;
+            f.fray = min(100, (f.fray || 0) + 8);
+            f.tempo = max(0, (f.tempo || 0) - 3);
             if (f === G.p) numPop(f.x + 3, f.y - 12, 'WAIT', '#ff8a3d');
           }
         }
@@ -7092,7 +7355,17 @@ function playerInput() {
   };
 }
 function tickPlayer() {
+  if (NET.spectating) return;
   const p = G.p, I = playerInput();
+  const held = heldOf(p);
+  if (held && held.type === 'weapon') {
+    if (p.cadenceSet && p.cadenceSet !== held.set) {
+      p.cadenceIndex = 0; p.cadenceStep = 0; p.cadenceSeq = ''; p.cadenceT = 0;
+    }
+    p.cadenceSet = held.set;
+  } else if (p.cadenceSet) {
+    p.cadenceSet = ''; p.cadenceIndex = 0; p.cadenceStep = 0; p.cadenceSeq = ''; p.cadenceT = 0;
+  }
   if (WORLD.royale && !brInput(p, I)) return;
   tickFighter(p, I);
   if (WORLD.royale) brAfter(p, I);
@@ -7298,6 +7571,7 @@ const outImg = outX.createImageData(RB, RB), ghostPool = [];
 let wctx = null; const LIT = [1, 1, 1];
 function pixelize(n, o) {
   const src = rigX.getImageData(0, 0, n, n).data, dst = outImg.data, W4 = RB * 4, n4 = n * 4, fl = o && o.flash, tn = o && o.tint;
+  outX.clearRect(0, 0, n, n);
   const L = LIT, l0 = L[0], l1 = L[1], l2 = L[2];
   for (let y = 0; y < n; y++) {
     let si = y * n4, di = y * W4;
@@ -7314,11 +7588,15 @@ function pixelize(n, o) {
   outX.putImageData(outImg, 0, 0, 0, 0, n, n);
 }
 function drawEnt(n, ox, oy, fn, wx, wy, o) {
-  rigX.setTransform(1, 0, 0, 1, 0, 0); rigX.clearRect(0, 0, n, n); rigX.translate(ox, oy); fn(rigX); rigX.setTransform(1, 0, 0, 1, 0, 0);
+  rigX.save(); rigX.setTransform(1, 0, 0, 1, 0, 0); rigX.clearRect(0, 0, RB, RB); rigX.translate(ox, oy); fn(rigX); rigX.restore();
   lightSample(wx, wy + (o && o.ly !== undefined ? o.ly : 0), LIT); if (o && o.unlit) LIT[0] = LIT[1] = LIT[2] = 1; pixelize(n, o);
   const S = VS.s, dx = round((wx - ox) * S) / S, dy = round((wy - oy) * S) / S;
-  if (o && o.alpha !== undefined) wctx.globalAlpha = o.alpha;
-  wctx.drawImage(outCv, 0, 0, n, n, dx, dy, n, n); wctx.globalAlpha = 1;
+  wctx.save();
+  wctx.imageSmoothingEnabled = false;
+  wctx.globalCompositeOperation = 'source-over';
+  wctx.globalAlpha = o && o.alpha !== undefined ? clamp(o.alpha, 0, 1) : 1;
+  wctx.drawImage(outCv, 0, 0, n, n, dx, dy, n, n);
+  wctx.restore();
   return [dx, dy];
 }
 function makeGhost(dx, dy, n, col) {
@@ -9055,20 +9333,21 @@ const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!s
 function panel(c, x, y, w, h, title) {
   c.fillStyle = INK; c.fillRect(x - 1, y - 1, w + 2, h + 2); c.fillStyle = '#1d1a29'; c.fillRect(x, y, w, h);
   c.fillStyle = '#4a4460'; c.fillRect(x, y, w, 1); c.fillRect(x, y, 1, h); c.fillStyle = '#2b2740'; c.fillRect(x, y + h - 1, w, 1); c.fillRect(x + w - 1, y, 1, h);
-  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, title, x + 5, y + 3, '#ffd35a'); }
+  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, fitText(title, w - 10), x + 5, y + 3, '#ffd35a'); }
 }
 function button(c, x, y, w, h, label, fn, o = {}) {
   const hv = !o.off && inR(x, y, w, h), on = o.on;
   c.fillStyle = o.off ? '#2b2740' : hv || on ? '#ffd35a' : '#4a4460'; c.fillRect(x, y, w, h);
   c.fillStyle = hv ? '#3a3350' : on ? '#3d3320' : '#262234'; c.fillRect(x + 1, y + 1, w - 2, h - 2);
-  textC(c, label, x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
+  textC(c, fitText(label, w - 8), x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
   if (!o.off) hit(x, y, w, h, fn);
 }
 function field(c, x, y, w, key, ph) {
   const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
-  if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
-  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
+  const display = v ? fitText(v, w - 8) : fitText(ph, w - 8);
+  drawText(c, display, x + 4, y + 4, v ? '#fff' : '#6a6485');
+  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(min(x + w - 5, x + 5 + textW(display)), y + 3, 1, 8); }
   hit(x, y, w, 14, () => { UI.focus = key; sfx('ui'); });
 }
 function chooser(c, x, y, w, label, names, key, descs) {
@@ -9163,6 +9442,34 @@ function itemTip(it) {
   const u = USES[it.id]; if (u && u.length) for (const l of wrapText('Used for: ' + u.slice(0, 6).join(', ') + (u.length > 6 ? `, +${u.length - 6} more` : ''), 150)) L.push([l, '#8ff5e6']);
   return L;
 }
+function drawTempoHud(c) {
+  const p = G.p;
+  if (!p) return;
+  const tempo = clamp(p.tempo || 0, 0, 100), pressure = clamp(p.pressure || 0, 0, 100), snapped = (p.snapped || 0) > 0;
+  const tier = tempo >= 100 ? 3 : tempo >= 65 ? 2 : tempo >= 35 ? 1 : 0;
+  const name = snapped ? 'SNAPPED' : tier === 3 ? 'TEMPO : ASHEN' : tier === 2 ? 'TEMPO : KINDLED' : tier === 1 ? 'TEMPO : PULSE' : 'TEMPO';
+  const col = snapped ? '#e2483b' : tier >= 2 ? '#ffd35a' : tier === 1 ? '#8ff5e6' : '#b9bdd0';
+  textS(c, name, 15, 37, col);
+  c.fillStyle = '#2b2740'; c.fillRect(15, 46, 72, 3);
+  c.fillStyle = snapped ? '#e2483b' : col; c.fillRect(15, 46, round(72 * tempo / 100), 3);
+  c.fillStyle = '#2b2740'; c.fillRect(15, 51, 72, 2);
+  c.fillStyle = pressure >= 70 ? '#ff6b6b' : pressure >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * pressure / 100), 2);
+  const W = heldItem();
+  if (W && W.type === 'weapon') {
+    const phrases = COMBAT_PHRASES[W.set] || COMBAT_PHRASES.sword;
+    const phrase = phrases[p.cadenceIndex || 0] || phrases[0];
+    const seq = p.cadenceSeq || '';
+    const branches = phrases.filter(q => q.pattern.join('').startsWith(seq));
+    const next = [];
+    for (const q of branches) { const b = q.pattern[seq.length]; if (b && !next.includes(b)) next.push(b); }
+    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  ${phrase.effect.toUpperCase()}`;
+    if (next.length) line += '  NEXT ' + next.join('/');
+    textS(c, fitText(line.trim(), 180), 15, 56, pressure > 55 ? '#ff6b6b' : '#8b8fa3');
+    textS(c, p.beatStance || 'OPEN', 91, 37, p.beatStance === 'FLOW' ? '#8ff5e6' : p.beatStance === 'STRAIN' ? '#ffb347' : '#b9bdd0');
+    if (p.paceLock > 0) textS(c, 'COMMIT', 91, 56, '#ffb347');
+  }
+  if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
+}
 function fmtTime(s) { s = s | 0; const h = (s / 3600) | 0, m = ((s % 3600) / 60) | 0; return h ? `${h}h ${m}m` : `${m}m`; }
 
 // ---------------- menus ----------------
@@ -9174,8 +9481,13 @@ function drawLogo(c, cy, sub) {
 }
 function drawTitle(c) {
   const uw = VS.uw, uh = VS.uh; c.fillStyle = 'rgba(18,13,31,.38)'; c.fillRect(0, 0, uw, uh);
-  drawLogo(c, round(uh * .14), 'BUILD. EXPLORE. FIGHT.');
-  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .31), gap = 18, bh = 20;
+  const logoSc = uw > 520 ? 5 : uw > 380 ? 4 : 3;
+  const logoY = max(8, round(uh * .12));
+  drawLogo(c, logoY, 'BUILD. EXPLORE. FIGHT.');
+  const bw = min(176, uw - 32), bx = round((uw - bw) / 2);
+  const gap = 18, bh = 20;
+  let by = max(round(uh * .31), logoY + logoSc * 8 + 24);
+  if (by + gap * 6 + bh > uh - 36) by = max(8, uh - 36 - (gap * 6 + bh));
   button(c, bx, by, bw, bh, 'SINGLEPLAYER', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
   button(c, bx, by + gap, bw, bh, 'MULTIPLAYER', () => { G.state = 'multiplayer'; UI.focus = null; sfx('ui'); });
   button(c, bx, by + gap * 3, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
@@ -9232,14 +9544,22 @@ function drawFriends(c) {
   const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(236, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FRIENDS');
   const fx = x + 8;
-  drawText(c, 'Save a friend’s name and six-letter world code.', fx, y + 16, '#d8d4e6');
-  drawText(c, 'Ask them for the code shown in Esc → PLAY TOGETHER.', fx, y + 26, '#8b8fa3');
-  drawText(c, 'NAME', fx, y + 46, '#b9bdd0'); field(c, fx + 34, y + 42, 94, 'friendName', 'friend name');
-  drawText(c, 'CODE', fx + 133, y + 46, '#b9bdd0'); field(c, fx + 165, y + 42, 60, 'friendCode', 'ABC123');
-  button(c, fx + 231, y + 42, 48, 14, 'ADD', () => {
+  const promptW = w - 16;
+  const prompt1 = wrapText("Save a friend's name and six-letter world code.", promptW);
+  const prompt2 = wrapText('Ask them for the code shown in Esc → PLAY TOGETHER.', promptW);
+  let promptY = y + 16;
+  prompt1.forEach(l => { drawText(c, l, fx, promptY, '#d8d4e6'); promptY += 9; });
+  prompt2.forEach(l => { drawText(c, l, fx, promptY, '#8b8fa3'); promptY += 9; });
+  const inputY = y + max(42, promptY + 7);
+  const nameW = max(54, min(94, w - 266));
+  drawText(c, 'NAME', fx, inputY + 4, '#b9bdd0'); field(c, fx + 34, inputY, nameW, 'friendName', 'friend name');
+  const codeX = fx + 34 + nameW + 5;
+  drawText(c, 'CODE', codeX, inputY + 4, '#b9bdd0'); field(c, codeX + 32, inputY, 60, 'friendCode', 'ABC123');
+  const addX = codeX + 32 + 60 + 6;
+  button(c, addX, inputY, 48, 14, 'ADD', () => {
     if (friendAdd(FORM.friendName, FORM.friendCode)) FORM.friendName = FORM.friendCode = '';
   });
-  const friends = friendList(), rowH = 22, start = y + 62, visible = max(1, floor((h - 96) / rowH));
+  const friends = friendList(), rowH = 22, start = inputY + 20, visible = max(1, floor((y + h - 30 - start) / rowH));
   UI.scroll = clamp(UI.scroll, 0, max(0, friends.length - visible));
   if (!ACCOUNT.active) textC(c, 'Sign in to save friends to an account on this device.', uw / 2, start + 10, '#ffb347', 1, drawText);
   else if (!friends.length) textC(c, 'No saved friends yet.', uw / 2, start + 12, '#8b8fa3', 1, drawText);
@@ -9257,9 +9577,9 @@ function drawFriends(c) {
       button(c, x + w - 53, ry + 3, 45, 14, 'REMOVE', () => { UI.confirm = 'friend:' + f.code; });
     }
   }
-  if (FRIENDS.note) drawText(c, FRIENDS.note, x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
-  else if (friends.length > visible) drawText(c, `${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, x + 7, y + h - 30, '#6a6485');
-  if (ACCOUNT.active) drawText(c, 'Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', x + 7, y + h - 20, '#8b8fa3');
+  if (FRIENDS.note) drawText(c, fitText(FRIENDS.note, w - 14), x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
+  else if (friends.length > visible) drawText(c, fitText(`${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, w - 14), x + 7, y + h - 30, '#6a6485');
+  if (ACCOUNT.active) drawText(c, fitText('Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', w - 14), x + 7, y + h - 20, '#8b8fa3');
   button(c, x + w - 66, y + h - 18, 60, 14, 'BACK', () => { G.state = 'title'; UI.focus = null; UI.confirm = null; sfx('ui'); });
 }
 function drawWorlds(c) {
@@ -9408,7 +9728,7 @@ function drawRingForm(c) {
   drawText(c, 'NAME', fx, y + 22, '#b9bdd0'); field(c, fx + 46, y + 18, fw - 46, 'nick', 'WAKER');
   skinPicker(c, fx, y + 38);
   drawText(c, 'MODE', fx, y + 70, '#b9bdd0');
-  const modes = ['BOW', 'SWORD', 'GRAPPLE'];
+  const modes = ['BOW', 'SWORD', 'GRAPPLE SWORD'];
   modes.forEach((name, i) => button(c, fx + i * (fw / 3), y + 66, fw / 3 - 2, 16, name, () => { FORM.duelMode = i; sfx('ui'); }, { on: FORM.duelMode === i }));
   const descriptions = ['Long-range arrows.', 'A balanced close-range blade.', 'Sword strikes and a grappling hook.'];
   drawText(c, descriptions[FORM.duelMode], fx, y + 92, '#d8d4e6');
@@ -9435,6 +9755,7 @@ function drawDuelQueue(c) {
 function drawHUD(c) {
   const p = G.p, uw = VS.uw, uh = VS.uh, A = WORLD.arena;
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
+  if (!A) drawTempoHud(c);
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (A && NET.duelMode && !NET.spectating) {
@@ -11936,7 +12257,12 @@ function sendFoes(P) {
 function onFoes(m) {
   for (const q of Array.isArray(m.e) ? m.e : []) {
     const id = q[0], d = q[1]; if (!d || typeof d !== 'object') continue; let g = COOP.ghosts.get(id);
-    if (!g) { if (!q[2] || typeof d.type !== 'string') continue; g = { ghost: true, nid: id, x: num(d.x), y: num(d.y), px: num(d.x), py: num(d.y), vx: 0, vy: 0, w: 8, h: 8, hp: 1, maxhp: 1, flash: 0, t: 0, dead: false }; COOP.ghosts.set(id, g); G.enemies.push(g); }
+    if (!g) {
+      if (!q[2] || typeof d.type !== 'string') continue;
+      const base = mkEnemy(d.type, num(d.x), num(d.y));
+      g = Object.assign(base, { ghost: true, nid: id, px: num(d.x), py: num(d.y), hp: num(d.hp, base.hp), maxhp: num(d.mhp, base.maxhp), flash: 0, spawnT: 18, dead: false });
+      COOP.ghosts.set(id, g); G.enemies.push(g);
+    }
     for (const k in d) {
       let v = d[k];
       if (k === 'x' || k === 'y') continue;
@@ -11958,7 +12284,7 @@ function onFoes(m) {
 // guests: creatures glide toward where the host says they are
 function ghostTick() {
   for (const g of COOP.ghosts.values()) {
-    g.px = g.x; g.py = g.y; if (g.flash > 0) g.flash--; g.heardT = (g.heardT || 0) + 1;
+    g.px = g.x; g.py = g.y; if (g.flash > 0) g.flash--; if (g.spawnT > 0) g.spawnT--; g.heardT = (g.heardT || 0) + 1;
     if (g._ref) for (const k in g._ref) { const r = COOP.ghosts.get(g._ref[k]); if (r) { g[k] = r; delete g._ref[k]; } }
     if (g.ax === undefined) continue; if (g.heardT <= (COOP.slow ? 12 : 6)) { g.ax += num(g.vx); if (g.fly) g.ay += num(g.vy); }
     if (abs(g.ax - g.x) > 80 || abs(g.ay - g.y) > 80) { g.x = g.px = g.ax; g.y = g.py = g.ay; } else { g.x += (g.ax - g.x) * .35; g.y += (g.ay - g.y) * .35; }
@@ -12208,7 +12534,7 @@ function drawJoinLong(c) {
   drawText(c, 'Best on the same Wi-Fi; most home internet works too.', fx, y + h - 24, '#8b8fa3');
   button(c, x + w - 70, y + h - 16, 60, 13, 'BACK', () => { COOP.long = false; coopLeave(); COOP.err = ''; sfx('ui'); });
 }
-function wrapDraw(c, s, x, y, w, col) { const words = String(s).split(' '); let line = '', yy = y; for (const wd of words) { const t = line ? line + ' ' + wd : wd; if (textW(t) > w && line) { drawText(c, line, x, yy, col); yy += 10; line = wd; } else line = t; } if (line) drawText(c, line, x, yy, col); }
+function wrapDraw(c, s, x, y, w, col) { let yy = y; for (const line of wrapText(s, w)) { if (line) drawText(c, line, x, yy, col); yy += 10; } }
 
 // ---------------- moving a world between computers (or from the Mac app to a browser) as text ----------------
 async function worldCopy(m) {
@@ -13237,7 +13563,9 @@ function genVeil(seed) { const w = 90, h = 6; const [c, x] = mk(w, h); const R =
 function resize() {
   const W = max(320, innerWidth), H = max(240, innerHeight); cv.width = W; cv.height = H;
   // the world is drawn at a whole-pixel scale that shows about 40 to 55 tiles from top to bottom; menus keep their own size
-  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s; VS.ui = clamp(round(H / 250), 2, 6) >= 4 ? 3 : 2; VS.uw = W / VS.ui; VS.uh = H / VS.ui;
+  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s;
+  VS.ui = W >= 900 && H >= 650 ? 3 : 2;
+  VS.uw = W / VS.ui; VS.uh = H / VS.ui;
   ctx.imageSmoothingEnabled = false;
   const bw = ceil(VS.vw) + 2, bh = ceil(VS.vh) + 2;[acv, actx] = mk(bw, bh);[lcv, lctx] = mk(bw, bh);[fcv, fctx] = mk(bw, bh);[gcv, gctx] = mk(bw, bh);[glcv, glctx] = mk(bw, bh); wctx = ctx;
   const mkV = (r, g, b, k) => { const [c, vx] = mk(64, 36); const d = vx.createImageData(64, 36); for (let Y = 0; Y < 36; Y++) for (let X = 0; X < 64; X++) { const q = hypot((X - 31.5) / 32, (Y - 17.5) / 18), i = (Y * 64 + X) * 4; d.data[i] = r; d.data[i + 1] = g; d.data[i + 2] = b; d.data[i + 3] = 255 * clamp((q - .62) * k, 0, 1); } vx.putImageData(d, 0, 0); return c; };
@@ -13682,8 +14010,8 @@ function frame(now) {
     G.time++; if (G.state !== 'play') { G.clock = (G.clock + 1 / 20000) % 1; } updateSun(); tickParts(); const c = G.cam; c.px = c.x; c.py = c.y;
     if (G.state !== 'play' && G.state !== 'intro') { c.x += .3; if (WORLD.endless) { streamTo(c.x + VS.vw / 2); if (c.x > (SPAWN_X + 600) * T) c.x = c.px = (SPAWN_X - 200) * T; } else if (c.x > WW * T - VS.vw - 2) c.x = c.px = 0; const hx = clamp(floor((c.x + VS.vw / 2) / T), 0, WW - 1); c.y += (camY(heights[hx] * T - VS.vh * .62) - c.y) * .02; c.x = camX(c.x); }
     if (G.state === 'intro') G.introT++;
-    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     if (BR.on && G.state === 'brlobby') brLobbyTick();
+    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     G.shake *= .86; G.flash *= .88; acc = 1;
     if (WORLD.arena && G.state === 'play' && G.time % 3 === 0) netSend();
   }

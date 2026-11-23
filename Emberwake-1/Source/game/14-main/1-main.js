@@ -29,7 +29,9 @@ function genVeil(seed) { const w = 90, h = 6; const [c, x] = mk(w, h); const R =
 function resize() {
   const W = max(320, innerWidth), H = max(240, innerHeight); cv.width = W; cv.height = H;
   // the world is drawn at a whole-pixel scale that shows about 40 to 55 tiles from top to bottom; menus keep their own size
-  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s; VS.ui = clamp(round(H / 250), 2, 6) >= 4 ? 3 : 2; VS.uw = W / VS.ui; VS.uh = H / VS.ui;
+  VS.W = W; VS.H = H; VS.s = clamp(floor(H / 300), 2, 6); VS.vw = W / VS.s; VS.vh = H / VS.s;
+  VS.ui = W >= 900 && H >= 650 ? 3 : 2;
+  VS.uw = W / VS.ui; VS.uh = H / VS.ui;
   ctx.imageSmoothingEnabled = false;
   const bw = ceil(VS.vw) + 2, bh = ceil(VS.vh) + 2;[acv, actx] = mk(bw, bh);[lcv, lctx] = mk(bw, bh);[fcv, fctx] = mk(bw, bh);[gcv, gctx] = mk(bw, bh);[glcv, glctx] = mk(bw, bh); wctx = ctx;
   const mkV = (r, g, b, k) => { const [c, vx] = mk(64, 36); const d = vx.createImageData(64, 36); for (let Y = 0; Y < 36; Y++) for (let X = 0; X < 64; X++) { const q = hypot((X - 31.5) / 32, (Y - 17.5) / 18), i = (Y * 64 + X) * 4; d.data[i] = r; d.data[i + 1] = g; d.data[i + 2] = b; d.data[i + 3] = 255 * clamp((q - .62) * k, 0, 1); } vx.putImageData(d, 0, 0); return c; };
@@ -474,8 +476,8 @@ function frame(now) {
     G.time++; if (G.state !== 'play') { G.clock = (G.clock + 1 / 20000) % 1; } updateSun(); tickParts(); const c = G.cam; c.px = c.x; c.py = c.y;
     if (G.state !== 'play' && G.state !== 'intro') { c.x += .3; if (WORLD.endless) { streamTo(c.x + VS.vw / 2); if (c.x > (SPAWN_X + 600) * T) c.x = c.px = (SPAWN_X - 200) * T; } else if (c.x > WW * T - VS.vw - 2) c.x = c.px = 0; const hx = clamp(floor((c.x + VS.vw / 2) / T), 0, WW - 1); c.y += (camY(heights[hx] * T - VS.vh * .62) - c.y) * .02; c.x = camX(c.x); }
     if (G.state === 'intro') G.introT++;
-    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     if (BR.on && G.state === 'brlobby') brLobbyTick();
+    if (G.state === 'duelQueue' && WORLD.arena && G.time % 3 === 0) duelQueueTick();
     G.shake *= .86; G.flash *= .88; acc = 1;
     if (WORLD.arena && G.state === 'play' && G.time % 3 === 0) netSend();
   }
