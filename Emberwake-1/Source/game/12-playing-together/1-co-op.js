@@ -434,12 +434,7 @@ function sendFoes(P) {
 function onFoes(m) {
   for (const q of Array.isArray(m.e) ? m.e : []) {
     const id = q[0], d = q[1]; if (!d || typeof d !== 'object') continue; let g = COOP.ghosts.get(id);
-    if (!g) {
-      if (!q[2] || typeof d.type !== 'string') continue;
-      const base = mkEnemy(d.type, num(d.x), num(d.y));
-      g = Object.assign(base, { ghost: true, nid: id, px: num(d.x), py: num(d.y), hp: num(d.hp, base.hp), maxhp: num(d.mhp, base.maxhp), flash: 0, spawnT: 18, dead: false });
-      COOP.ghosts.set(id, g); G.enemies.push(g);
-    }
+    if (!g) { if (!q[2] || typeof d.type !== 'string') continue; g = { ghost: true, nid: id, x: num(d.x), y: num(d.y), px: num(d.x), py: num(d.y), vx: 0, vy: 0, w: 8, h: 8, hp: 1, maxhp: 1, flash: 0, t: 0, dead: false }; COOP.ghosts.set(id, g); G.enemies.push(g); }
     for (const k in d) {
       let v = d[k];
       if (k === 'x' || k === 'y') continue;
@@ -461,7 +456,7 @@ function onFoes(m) {
 // guests: creatures glide toward where the host says they are
 function ghostTick() {
   for (const g of COOP.ghosts.values()) {
-    g.px = g.x; g.py = g.y; if (g.flash > 0) g.flash--; if (g.spawnT > 0) g.spawnT--; g.heardT = (g.heardT || 0) + 1;
+    g.px = g.x; g.py = g.y; if (g.flash > 0) g.flash--; g.heardT = (g.heardT || 0) + 1;
     if (g._ref) for (const k in g._ref) { const r = COOP.ghosts.get(g._ref[k]); if (r) { g[k] = r; delete g._ref[k]; } }
     if (g.ax === undefined) continue; if (g.heardT <= (COOP.slow ? 12 : 6)) { g.ax += num(g.vx); if (g.fly) g.ay += num(g.vy); }
     if (abs(g.ax - g.x) > 80 || abs(g.ay - g.y) > 80) { g.x = g.px = g.ax; g.y = g.py = g.ay; } else { g.x += (g.ax - g.x) * .35; g.y += (g.ay - g.y) * .35; }
@@ -711,7 +706,7 @@ function drawJoinLong(c) {
   drawText(c, 'Best on the same Wi-Fi; most home internet works too.', fx, y + h - 24, '#8b8fa3');
   button(c, x + w - 70, y + h - 16, 60, 13, 'BACK', () => { COOP.long = false; coopLeave(); COOP.err = ''; sfx('ui'); });
 }
-function wrapDraw(c, s, x, y, w, col) { let yy = y; for (const line of wrapText(s, w)) { if (line) drawText(c, line, x, yy, col); yy += 10; } }
+function wrapDraw(c, s, x, y, w, col) { const words = String(s).split(' '); let line = '', yy = y; for (const wd of words) { const t = line ? line + ' ' + wd : wd; if (textW(t) > w && line) { drawText(c, line, x, yy, col); yy += 10; line = wd; } else line = t; } if (line) drawText(c, line, x, yy, col); }
 
 // ---------------- moving a world between computers (or from the Mac app to a browser) as text ----------------
 async function worldCopy(m) {

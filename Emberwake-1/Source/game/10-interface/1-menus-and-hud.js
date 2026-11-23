@@ -11,21 +11,20 @@ const hit = (x, y, w, h, fn, slot) => HITS_NEXT.push({ x, y, w, h, fn, slot: !!s
 function panel(c, x, y, w, h, title) {
   c.fillStyle = INK; c.fillRect(x - 1, y - 1, w + 2, h + 2); c.fillStyle = '#1d1a29'; c.fillRect(x, y, w, h);
   c.fillStyle = '#4a4460'; c.fillRect(x, y, w, 1); c.fillRect(x, y, 1, h); c.fillStyle = '#2b2740'; c.fillRect(x, y + h - 1, w, 1); c.fillRect(x + w - 1, y, 1, h);
-  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, fitText(title, w - 10), x + 5, y + 3, '#ffd35a'); }
+  if (title) { c.fillStyle = '#2b2740'; c.fillRect(x + 1, y + 1, w - 2, 11); textS(c, title, x + 5, y + 3, '#ffd35a'); }
 }
 function button(c, x, y, w, h, label, fn, o = {}) {
   const hv = !o.off && inR(x, y, w, h), on = o.on;
   c.fillStyle = o.off ? '#2b2740' : hv || on ? '#ffd35a' : '#4a4460'; c.fillRect(x, y, w, h);
   c.fillStyle = hv ? '#3a3350' : on ? '#3d3320' : '#262234'; c.fillRect(x + 1, y + 1, w - 2, h - 2);
-  textC(c, fitText(label, w - 8), x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
+  textC(c, label, x + w / 2, y + round(h / 2) - 4, o.off ? '#6a6485' : hv || on ? '#ffd35a' : (o.col || '#fff'), 1, drawText);
   if (!o.off) hit(x, y, w, h, fn);
 }
 function field(c, x, y, w, key, ph) {
   const f = UI.focus === key, raw = FORM[key], secret = key === 'accountPassword' || key === 'accountConfirm', v = secret ? '*'.repeat(min(raw.length, max(1, floor((w - 8) / 6)))) : raw;
   c.fillStyle = f ? '#ffd35a' : inR(x, y, w, 14) ? '#8c86a8' : '#4a4460'; c.fillRect(x, y, w, 14); c.fillStyle = INK; c.fillRect(x + 1, y + 1, w - 2, 12);
-  const display = v ? fitText(v, w - 8) : fitText(ph, w - 8);
-  drawText(c, display, x + 4, y + 4, v ? '#fff' : '#6a6485');
-  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(min(x + w - 5, x + 5 + textW(display)), y + 3, 1, 8); }
+  if (v) drawText(c, v, x + 4, y + 4, '#fff'); else drawText(c, ph, x + 4, y + 4, '#6a6485');
+  if (f && (performance.now() / 400 | 0) & 1) { c.fillStyle = '#ffd35a'; c.fillRect(x + 5 + (v ? textW(v) : -1), y + 3, 1, 8); }
   hit(x, y, w, 14, () => { UI.focus = key; sfx('ui'); });
 }
 function chooser(c, x, y, w, label, names, key, descs) {
@@ -120,34 +119,6 @@ function itemTip(it) {
   const u = USES[it.id]; if (u && u.length) for (const l of wrapText('Used for: ' + u.slice(0, 6).join(', ') + (u.length > 6 ? `, +${u.length - 6} more` : ''), 150)) L.push([l, '#8ff5e6']);
   return L;
 }
-function drawTempoHud(c) {
-  const p = G.p;
-  if (!p) return;
-  const tempo = clamp(p.tempo || 0, 0, 100), pressure = clamp(p.pressure || 0, 0, 100), snapped = (p.snapped || 0) > 0;
-  const tier = tempo >= 100 ? 3 : tempo >= 65 ? 2 : tempo >= 35 ? 1 : 0;
-  const name = snapped ? 'SNAPPED' : tier === 3 ? 'TEMPO : ASHEN' : tier === 2 ? 'TEMPO : KINDLED' : tier === 1 ? 'TEMPO : PULSE' : 'TEMPO';
-  const col = snapped ? '#e2483b' : tier >= 2 ? '#ffd35a' : tier === 1 ? '#8ff5e6' : '#b9bdd0';
-  textS(c, name, 15, 37, col);
-  c.fillStyle = '#2b2740'; c.fillRect(15, 46, 72, 3);
-  c.fillStyle = snapped ? '#e2483b' : col; c.fillRect(15, 46, round(72 * tempo / 100), 3);
-  c.fillStyle = '#2b2740'; c.fillRect(15, 51, 72, 2);
-  c.fillStyle = pressure >= 70 ? '#ff6b6b' : pressure >= 35 ? '#ffb347' : '#6a6485'; c.fillRect(15, 51, round(72 * pressure / 100), 2);
-  const W = heldItem();
-  if (W && W.type === 'weapon') {
-    const phrases = COMBAT_PHRASES[W.set] || COMBAT_PHRASES.sword;
-    const phrase = phrases[p.cadenceIndex || 0] || phrases[0];
-    const seq = p.cadenceSeq || '';
-    const branches = phrases.filter(q => q.pattern.join('').startsWith(seq));
-    const next = [];
-    for (const q of branches) { const b = q.pattern[seq.length]; if (b && !next.includes(b)) next.push(b); }
-    let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  ${phrase.effect.toUpperCase()}`;
-    if (next.length) line += '  NEXT ' + next.join('/');
-    textS(c, fitText(line.trim(), 180), 15, 56, pressure > 55 ? '#ff6b6b' : '#8b8fa3');
-    textS(c, p.beatStance || 'OPEN', 91, 37, p.beatStance === 'FLOW' ? '#8ff5e6' : p.beatStance === 'STRAIN' ? '#ffb347' : '#b9bdd0');
-    if (p.paceLock > 0) textS(c, 'COMMIT', 91, 56, '#ffb347');
-  }
-  if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
-}
 function fmtTime(s) { s = s | 0; const h = (s / 3600) | 0, m = ((s % 3600) / 60) | 0; return h ? `${h}h ${m}m` : `${m}m`; }
 
 // ---------------- menus ----------------
@@ -159,13 +130,8 @@ function drawLogo(c, cy, sub) {
 }
 function drawTitle(c) {
   const uw = VS.uw, uh = VS.uh; c.fillStyle = 'rgba(18,13,31,.38)'; c.fillRect(0, 0, uw, uh);
-  const logoSc = uw > 520 ? 5 : uw > 380 ? 4 : 3;
-  const logoY = max(8, round(uh * .12));
-  drawLogo(c, logoY, 'BUILD. EXPLORE. FIGHT.');
-  const bw = min(176, uw - 32), bx = round((uw - bw) / 2);
-  const gap = 18, bh = 20;
-  let by = max(round(uh * .31), logoY + logoSc * 8 + 24);
-  if (by + gap * 6 + bh > uh - 36) by = max(8, uh - 36 - (gap * 6 + bh));
+  drawLogo(c, round(uh * .14), 'BUILD. EXPLORE. FIGHT.');
+  const bw = 176, bx = round((uw - bw) / 2), by = round(uh * .31), gap = 18, bh = 20;
   button(c, bx, by, bw, bh, 'SINGLEPLAYER', () => { G.state = 'worlds'; UI.scroll = 0; UI.confirm = null; G.menuNote = ''; sfx('ui'); });
   button(c, bx, by + gap, bw, bh, 'MULTIPLAYER', () => { G.state = 'multiplayer'; UI.focus = null; sfx('ui'); });
   button(c, bx, by + gap * 3, bw, bh, 'FRIENDS', () => { G.state = 'friends'; UI.focus = null; UI.scroll = 0; FRIENDS.note = ''; sfx('ui'); });
@@ -222,22 +188,14 @@ function drawFriends(c) {
   const uw = VS.uw, uh = VS.uh, w = min(360, uw - 16), h = min(236, uh - 16), x = round((uw - w) / 2), y = max(8, round((uh - h) / 2));
   c.fillStyle = 'rgba(18,13,31,.55)'; c.fillRect(0, 0, uw, uh); panel(c, x, y, w, h, 'FRIENDS');
   const fx = x + 8;
-  const promptW = w - 16;
-  const prompt1 = wrapText("Save a friend's name and six-letter world code.", promptW);
-  const prompt2 = wrapText('Ask them for the code shown in Esc → PLAY TOGETHER.', promptW);
-  let promptY = y + 16;
-  prompt1.forEach(l => { drawText(c, l, fx, promptY, '#d8d4e6'); promptY += 9; });
-  prompt2.forEach(l => { drawText(c, l, fx, promptY, '#8b8fa3'); promptY += 9; });
-  const inputY = y + max(42, promptY + 7);
-  const nameW = max(54, min(94, w - 266));
-  drawText(c, 'NAME', fx, inputY + 4, '#b9bdd0'); field(c, fx + 34, inputY, nameW, 'friendName', 'friend name');
-  const codeX = fx + 34 + nameW + 5;
-  drawText(c, 'CODE', codeX, inputY + 4, '#b9bdd0'); field(c, codeX + 32, inputY, 60, 'friendCode', 'ABC123');
-  const addX = codeX + 32 + 60 + 6;
-  button(c, addX, inputY, 48, 14, 'ADD', () => {
+  drawText(c, 'Save a friend’s name and six-letter world code.', fx, y + 16, '#d8d4e6');
+  drawText(c, 'Ask them for the code shown in Esc → PLAY TOGETHER.', fx, y + 26, '#8b8fa3');
+  drawText(c, 'NAME', fx, y + 46, '#b9bdd0'); field(c, fx + 34, y + 42, 94, 'friendName', 'friend name');
+  drawText(c, 'CODE', fx + 133, y + 46, '#b9bdd0'); field(c, fx + 165, y + 42, 60, 'friendCode', 'ABC123');
+  button(c, fx + 231, y + 42, 48, 14, 'ADD', () => {
     if (friendAdd(FORM.friendName, FORM.friendCode)) FORM.friendName = FORM.friendCode = '';
   });
-  const friends = friendList(), rowH = 22, start = inputY + 20, visible = max(1, floor((y + h - 30 - start) / rowH));
+  const friends = friendList(), rowH = 22, start = y + 62, visible = max(1, floor((h - 96) / rowH));
   UI.scroll = clamp(UI.scroll, 0, max(0, friends.length - visible));
   if (!ACCOUNT.active) textC(c, 'Sign in to save friends to an account on this device.', uw / 2, start + 10, '#ffb347', 1, drawText);
   else if (!friends.length) textC(c, 'No saved friends yet.', uw / 2, start + 12, '#8b8fa3', 1, drawText);
@@ -255,9 +213,9 @@ function drawFriends(c) {
       button(c, x + w - 53, ry + 3, 45, 14, 'REMOVE', () => { UI.confirm = 'friend:' + f.code; });
     }
   }
-  if (FRIENDS.note) drawText(c, fitText(FRIENDS.note, w - 14), x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
-  else if (friends.length > visible) drawText(c, fitText(`${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, w - 14), x + 7, y + h - 30, '#6a6485');
-  if (ACCOUNT.active) drawText(c, fitText('Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', w - 14), x + 7, y + h - 20, '#8b8fa3');
+  if (FRIENDS.note) drawText(c, FRIENDS.note, x + 7, y + h - 30, FRIENDS.note.startsWith('Could not') ? '#ff9a8a' : '#7ddc6f');
+  else if (friends.length > visible) drawText(c, `${UI.scroll + 1}-${min(friends.length, UI.scroll + visible)} of ${friends.length}  (wheel)`, x + 7, y + h - 30, '#6a6485');
+  if (ACCOUNT.active) drawText(c, 'Local to ' + ACCOUNT.active.name + ' in this browser. ENTER chats in their world.', x + 7, y + h - 20, '#8b8fa3');
   button(c, x + w - 66, y + h - 18, 60, 14, 'BACK', () => { G.state = 'title'; UI.focus = null; UI.confirm = null; sfx('ui'); });
 }
 function drawWorlds(c) {
@@ -323,8 +281,8 @@ function drawAccounts(c) {
     button(c, x + w - 70, y + h - 26, 60, 18, 'BACK', () => { ACCOUNT.form = 'list'; UI.focus = null; sfx('ui'); });
   } else {
     textC(c, 'SIGN IN TO CONTINUE', uw / 2, y + 17, '#b9bdd0', 1, drawText);
-    textC(c, 'Username and password work for profiles saved in this browser.', uw / 2, y + 28, '#8b8fa3', 1, drawText);
-    const rowH = 22, start = y + 34, visible = max(1, floor((h - 120) / rowH));
+    drawText(c, fitText('Username and password work for profiles saved in this browser.', w - 16), x + 8, y + 28, '#8b8fa3');
+    const rowH = 22, start = y + 44, visible = max(1, floor((h - 150) / rowH));
     UI.scroll = clamp(UI.scroll, 0, max(0, ACCOUNT.profiles.length - visible));
     for (let i = 0; i < visible; i++) {
       const p = ACCOUNT.profiles[i + UI.scroll]; if (!p) break;
@@ -433,21 +391,10 @@ function drawDuelQueue(c) {
 function drawHUD(c) {
   const p = G.p, uw = VS.uw, uh = VS.uh, A = WORLD.arena;
   c.drawImage(SPR.heart, 3, 3); bar(c, 15, 4, 72, 7, p.hp / p.maxhp, p.hp < 30 && (G.time >> 3) & 1 ? '#ff9a8a' : '#e2483b', '#8f2233'); textO(c, ceil(max(0, p.hp)), 91, 4, '#fff');
-  if (!A) drawTempoHud(c);
   if (!A && gearOn()) { drawGearHud(c); drawStyleHud(c); drawFamHud(c); drawDrill(c); }
   bar(c, 15, 14, 72, 4, p.stam / p.maxstam, p.stam < 22 ? '#ffd35a' : '#7ddc6f', p.stam < 22 ? '#b85a1e' : '#2f8a43');
   if (A && NET.duelMode && !NET.spectating) {
-    const rw = 88, rx = round((uw - rw) / 2), ry = 4;
-    textC(c, 'RANGE ' + round(duelWeaponRange(p, heldOf(p))), uw / 2, ry, '#ffd35a', 1, textO);
-    bar(c, rx, ry + 9, rw, 3, (p.duelRange || 0) / 18, '#8ff5e6', '#2b2740');
-    if (p.duelCooldown > 0) textC(c, 'READY IN ' + (p.duelCooldown / 60).toFixed(1), uw / 2, ry + 15, '#d8d4e6', 1, textO);
-  }
-  if (p.atk && p.atk.phase === 2) {
-    const rec = max(1, round(p.atk.m.rec * (p.atk.tm || p.atk.W.wsp || 1))), prog = clamp(p.atk.pt / rec, 0, 1);
-    const w = 120, x = round((uw - w) / 2), y = hotbarLayout().y - 30;
-    bar(c, x, y, w, 5, prog, prog >= .78 && prog <= .92 ? '#ffd35a' : prog >= .68 ? '#7ddc6f' : '#ff8a3d', '#3a2a20');
-    c.fillStyle = '#ffd35a'; c.fillRect(x + round(w * .78), y - 1, max(1, round(w * .14)), 7);
-    textC(c, prog < .68 ? 'WAIT FOR THE RETURN' : prog <= .92 ? 'STRIKE NOW' : 'RECOVERING', uw / 2, y - 9, prog >= .68 && prog <= .92 ? '#ffd35a' : '#d8d4e6', 1, textO);
+    textC(c, 'RANGE ' + round(duelWeaponRange(p, heldOf(p))), uw / 2, 4, '#ffd35a', 1, textO);
   }
   if (!A && WORLD.mode !== 1) { const f = G.food / 100; bar(c, 15, 20, 72, 2, f, f < .25 && (G.time >> 4) & 1 ? '#ff9a8a' : '#e0a050', '#7a4a1a'); if (f < .3) textO(c, f <= 0 ? 'STARVING' : 'HUNGRY', 91, 16, '#e0a050'); }
   if (p.riposte > 0 && (G.time >> 2) & 1) textO(c, 'RIPOSTE READY', 15, 22, '#8ff5e6');
@@ -511,7 +458,7 @@ function drawRingStatus(c) {
   const uw = VS.uw, list = [...G.fighters].filter(f => !f.npc).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   const w = 120, x = uw - w - 4; let y = 4;
   c.fillStyle = 'rgba(18,13,31,.62)'; c.fillRect(x, y, w, 13 + min(5, list.length) * 9); c.fillStyle = NET.status === 'online' ? '#7ddc6f' : '#ffb347'; c.fillRect(x, y, 2, 13 + min(5, list.length) * 9);
-  textS(c, NET.duelMode ? NET.duelMode.toUpperCase() + ' DUEL' : `RING ${NET.code.toUpperCase()}`, x + 6, y + 3, '#ffd35a'); drawText(c, NET.status === 'online' ? 'live' : NET.status === 'connecting' ? '...' : 'solo', x + w - 24, y + 3, NET.status === 'online' ? '#7ddc6f' : '#ffb347');
+  textS(c, `RING ${NET.code.toUpperCase()}`, x + 6, y + 3, '#ffd35a'); drawText(c, NET.status === 'online' ? 'live' : NET.status === 'connecting' ? '...' : 'solo', x + w - 24, y + 3, NET.status === 'online' ? '#7ddc6f' : '#ffb347');
   list.slice(0, 5).forEach((f, i) => { const yy = y + 13 + i * 9, me = f === G.p; drawText(c, (me ? '> ' : '') + f.name, x + 6, yy, me ? '#ffd35a' : f.echoBot ? '#b9bdd0' : '#8ff5e6'); drawText(c, String(f.kills), x + w - 8 - textW(f.kills), yy, '#fff'); });
   textC(c, ringStatusText(), uw / 2, 4, NET.status === 'online' ? '#7ddc6f' : '#ffb347', 1, textO);
   if (NET.roundOver) textC(c, 'next round in ' + ceil(NET.roundOver / 60), uw / 2, 14, '#fff', 1, textO);
