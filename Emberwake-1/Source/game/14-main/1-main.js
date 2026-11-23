@@ -419,7 +419,7 @@ function ambient() {
 }
 function snapCam() { const p = G.p; G.cam.x = G.cam.px = camX(p.x + 3 - VS.vw / 2); G.cam.y = G.cam.py = camY(p.y + 4 - VS.vh / 2 - 8); }
 function tickCam() {
-  const c = G.cam, p = brCamTarget() || G.p; c.px = c.x; c.py = c.y;
+  const c = G.cam, watchers = NET.spectating ? G.fighters.filter(f => f.remote && !f.dead) : [], p = watchers.length ? { x: watchers.reduce((n, f) => n + f.x, 0) / watchers.length, y: watchers.reduce((n, f) => n + f.y, 0) / watchers.length } : brCamTarget() || G.p; c.px = c.x; c.py = c.y;
   const lx = (mouse.x / VS.s - VS.vw / 2) * .15, ly = (mouse.y / VS.s - VS.vh / 2) * .15, free = !UI.open && !G.dialog && !G.cine && !G.link;
   const spy = G.spy && free && !WORLD.arena && hasItem('spyglass') ? 1 : 0; if (G.spy && !spy && !hasItem('spyglass')) G.spy = false;
   let tx = p.x + 3 - VS.vw / 2 + (free ? lx * (1 + spy * 9) : 0), ty = p.y + 4 - VS.vh / 2 + (free ? ly * (1 + spy * 7) : 0) - (G.boss ? 22 : 8), k = spy ? .06 : .14;
