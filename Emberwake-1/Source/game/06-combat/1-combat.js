@@ -670,31 +670,15 @@ function applyHit(a, e, hx, hy) {
   const P0 = f === G.p, sharp = P0 && f.sharp > 0;
   const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
   const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
-<<<<<<< HEAD
   const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode, falling = duel && !f.onGround && f.vy > 1.2, sprint = duel && hypot(f.vx, f.vy) > 1.2;
   let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1) * (falling ? 1.25 : 1);
-  const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
-=======
-  const duel = WORLD.arena && !WORLD.royale && !!NET.duelMode, falling = duel && !f.onGround && f.vy > 1.2, sprint = duel && abs(f.vx) > 1.2;
-  let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1) * (falling ? 1.25 : 1);
-  if (P0 && !duel) {
-    const repeated = (f.paceRepeat === a.id ? (f.paceRepeatN || 1) : 1);
-    if (repeated >= 3) dmg *= max(.45, 1 - (repeated - 2) * .14);
-  }
   const lk = P0 && !duel ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
->>>>>>> ecc0a0f (changes)
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face, ky = m.kb[1];
   if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
   if (duel) { kx = sprint ? 5.2 * a.face : .6 * a.face; ky = sprint ? -1.8 : -.25; }
   if (!strike(f, e, dmg, kx, ky, { stagger: m.flow === 'down' ? max(m.stagger || 0, 45) : m.stagger, launch: m.launch, crit, stop: (m.stop || 0) + (lk && lk.tag ? 2 : 0), shake: m.shake, blunt: m.blunt, cold: a.W.cold, hx, hy })) return;
-<<<<<<< HEAD
-  if (P0) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
-=======
-  if (a.echo) { a.echo = 0; strike(f, e, max(1, round(dmg * .45)), kx * .6, m.kb[1] * .5, { stagger: 12, crit: false, stop: 2, blunt: m.blunt, cold: a.W.cold, hx, hy }); }
-  if (P0) combatTempoHit(f, a, e);
   if (P0 && !duel) { flowSet(a, e, lk, hx, hy); famGain(a.setName, ((a.fresh ? 1 : .4) + (lk && lk.tag ? 1 : 0)) * (e.type === 'dummy' ? .5 : 1)); if (e.type !== 'dummy') artGain(a.W); }
->>>>>>> ecc0a0f (changes)
   if (a.W.burn && !e.dead) applyStatus(e, 'burn', f, { d: 110 });
   if (!e.dead) { if (a.W.frost) applyStatus(e, 'frost', f, { d: 100 }); if (a.W.poison || (P0 && f.venom > 0)) applyStatus(e, 'poison', f, { d: 260 }); if (a.W.bleed && Math.random() < a.W.bleed) applyStatus(e, 'bleed', f, { d: 180 }); }
   if (a.W.steal && f.hp < f.maxhp) { f.hp = min(f.maxhp, f.hp + max(1, round(dmg * a.W.steal))); }
