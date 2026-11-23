@@ -5784,11 +5784,20 @@ function startAttack(f, btn, I, force) {
   const set = MOVESETS[W.set], c = atkContext(f, I); let id = force || resolveMove(set, btn, c); if (!force && f === G.p) id = famGate(W.set, set, id, btn, c);
   let m = set.moves[id]; if (!m) return false;
   if (f.isPlayer) {
+    if (f.paceRepeat === id) f.paceRepeatN = min(6, (f.paceRepeatN || 0) + 1);
+    else { f.paceRepeat = id; f.paceRepeatN = 1; }
+    f.paceRepeatT = 120;
+  }
+  if (f.isPlayer) {
     if (f.lastMove === id) {
       f.dissonance = min(100, (f.dissonance || 0) + 7);
       f.fray = min(100, (f.fray || 0) + 5);
     } else {
       f.dissonance = max(0, (f.dissonance || 0) - 3);
+    }
+    if (btn === 'L') {
+      f.stam = max(0, f.stam - 2);
+      f.stamDelay = max(f.stamDelay || 0, 18);
     }
   }
   if (force) { if (m.cost) { const fray = f.isPlayer ? (f.fray || 0) : 0, rush = (f.atkTiming || 'normal') === 'rushed'; const cost = round(m.cost * (1 + (fray >= 70 ? .5 : fray >= 40 ? .25 : 0) + (rush ? .35 : 0))); f.stam = max(0, f.stam - cost); f.stamDelay = 42; } }
@@ -5803,6 +5812,10 @@ function startAttack(f, btn, I, force) {
   const timing = f.atkTiming || 'normal';
   f.atkTiming = null;
   const a = f.atk = { f, id, m, W, set, setName: W.set, btn, timing, gm: 1, phase: 0, pt: 0, face: c.side, aimA: c.elev, hits: new Map(), charge: 0, charged: false, hit: false, air: c.air, fresh, stale: fresh ? 1.1 : ([1, .86, .72, .6, .5][rep] || .5), act: m.act, dashT: 0, dashN: 0, prevAng: 0, aimOff: 0, th: 0, crit: !!m.crit, dist: c.dist, tx: I.wx, ty: I.wy, shots: 0, shotI: 0 };
+  if (f.isPlayer) {
+    const paceBase = max(10, round((m.wind + m.act + m.rec) * (m.big ? .24 : .18)));
+    f.paceLock = paceBase + (f.paceRepeatN > 2 ? min(12, f.paceRepeatN * 3) : 0) + (f.paceDebt > 40 ? 8 : 0);
+  }
   // what you wear and how well you know the weapon change how each kind of blow comes out
   if (f === G.p && gearOn()) { const air = c.air, sh = m.kind === 'shot', spd = (sh ? gearMul('bow') : a.btn === 'L' ? gearMul('light') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleSpeed(W, id); a.tm = (W.wsp || 1) / spd; a.gm = (a.btn === 'H' ? gearMul('heavy') : 1) * (air ? (gearMul('air') + 1) / 2 : 1) * styleDmg(W, id); a.dk = gearMul('dash') * (air ? gearMul('air') : 1); a.critB = (gearHas('crit') ? .06 : 0) + (gearHas('keen') ? .08 : 0); }
   const timingMul = timing === 'perfect' ? 1.38 : timing === 'rushed' ? .58 : timing === 'steady' ? 1.16 : 1;
@@ -6019,17 +6032,19 @@ const COMBAT_PHRASES = {
 function advancePhraseBranch(f, setName, btn) {
   const phrases = COMBAT_PHRASES[setName] || COMBAT_PHRASES.sword;
   const seq = ((f.cadenceSeq || '') + btn).slice(-8);
-  const exact = phrases.findIndex(p => p.pattern.join('') === seq);
-  if (exact >= 0) {
-    f.cadenceIndex = exact;
-    f.cadenceStep = 0;
-    f.cadenceSeq = '';
-    f.cadenceT = 180;
-    f.dissonance = max(0, (f.dissonance || 0) - 12);
-    return { complete: phrases[exact] };
-  }
   let candidates = phrases.map((p, i) => ({ p, i })).filter(q => q.p.pattern.join('').startsWith(seq));
   if (candidates.length) {
+    const exact = candidates.filter(q => q.p.pattern.join('') === seq);
+    const longer = candidates.filter(q => q.p.pattern.length > seq.length);
+    if (exact.length && !longer.length) {
+      const done = exact[0];
+      f.cadenceIndex = done.i;
+      f.cadenceStep = 0;
+      f.cadenceSeq = '';
+      f.cadenceT = 180;
+      f.dissonance = max(0, (f.dissonance || 0) - 12);
+      return { complete: done.p };
+    }
     const current = phrases[f.cadenceIndex || 0];
     const curKey = current ? current.pattern.join('') : '';
     const same = candidates.find(q => q.i === (f.cadenceIndex || 0) && curKey.startsWith(seq));
@@ -6124,6 +6139,10 @@ function applyHit(a, e, hx, hy) {
   const rarePerfect = P0 && a.timing === 'perfect' && Math.random() < .03;
   const crit = a.crit || rarePerfect || Math.random() < .07 + (a.W.crit || 0) + (a.critB || 0) + (P0 ? boonAdd('crit') : 0);
   let dmg = a.W.dmg * m.dmg * a.stale * (P0 ? 1 + rankI() * .04 + qBonus(a.W.id) + (sharp ? .2 : 0) : 1) * (crit && !a.crit ? 1.6 : 1) * (f.dmgMul || 1) * (a.gm || 1) * (P0 ? (a.btn === 'H' ? boonMul('hdmg') : 1) * (m.counter ? boonMul('counter') : 1) : 1);
+  if (P0) {
+    const repeated = (f.paceRepeat === a.id ? (f.paceRepeatN || 1) : 1);
+    if (repeated >= 3) dmg *= max(.45, 1 - (repeated - 2) * .14);
+  }
   const lk = P0 ? flowPay(a, e) : null; if (lk) dmg *= lk.mul * (lk.tag ? boonMul('flow') : 1);
   dmg = max(1, round(dmg * frand(.93, 1.07)));
   let kx = m.kb[0] * a.face; if (m.kind === 'spin') kx = m.kb[0] * (sign((e.x + e.w / 2) - (f.x + 3)) || a.face);
@@ -7069,7 +7088,7 @@ function newFighter(x, y, o) {
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
     tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
     cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
-    cadenceIndex: 0, phraseSurge: null
+    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -7140,6 +7159,10 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.paceLock > 0) f.paceLock--;
+  if (f.paceDebt > 0) f.paceDebt = max(0, f.paceDebt - .35);
+  if (f.paceRepeatT > 0) f.paceRepeatT--;
+  else if (f.paceRepeatN > 0) { f.paceRepeatN = 0; f.paceRepeat = ''; }
   if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
   if (f.snapped > 0) f.snapped--;
   if (f.tempoT > 0) f.tempoT--;
@@ -7172,6 +7195,13 @@ function tickFighter(f, I) {
   if (isW && free) {
     if (I.lp || I.rp) {
       const b = I.lp ? 'L' : 'H';
+      if (f.paceLock > 0) {
+        f.fray = min(100, (f.fray || 0) + 3);
+        f.dissonance = min(100, (f.dissonance || 0) + 5);
+        f.paceDebt = min(100, (f.paceDebt || 0) + 7);
+        f.attackInputCd = 4;
+        if (f === G.p && G.time % 12 === 0) numPop(f.x + 3, f.y - 12, 'COMMIT', '#ff8a3d', .7);
+      } else
       if (f.attackInputCd <= 0) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
@@ -9369,6 +9399,7 @@ function drawTempoHud(c) {
     let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  BRANCH`;
     if (next.length) line += '  NEXT ' + next.join('/');
     textS(c, fitText(line.trim(), 180), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+    if (p.paceLock > 0) textS(c, 'COMMIT', 91, 56, '#ffb347');
   }
   if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
 }

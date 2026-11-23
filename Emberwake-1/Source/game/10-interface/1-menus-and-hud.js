@@ -143,6 +143,7 @@ function drawTempoHud(c) {
     let line = seq ? `${phrase.name.toUpperCase()}  ${seq.split('').join('-')}` : `${phrase.name.toUpperCase()}  BRANCH`;
     if (next.length) line += '  NEXT ' + next.join('/');
     textS(c, fitText(line.trim(), 180), 15, 56, (p.dissonance || 0) > 55 ? '#ff6b6b' : '#8b8fa3');
+    if (p.paceLock > 0) textS(c, 'COMMIT', 91, 56, '#ffb347');
   }
   if (snapped) textS(c, String(ceil(p.snapped / 60)) + 's', 91, 46, '#ff9a8a');
 }

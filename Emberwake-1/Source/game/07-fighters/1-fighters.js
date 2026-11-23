@@ -24,7 +24,7 @@ function newFighter(x, y, o) {
     kills: 0, deaths: 0, foes: [], atkN: 0, attackInputCd: 0, lastTiming: 'normal',
     tempo: 0, fray: 0, snapped: 0, tempoT: 0, repeatMove: '', repeatCount: 0,
     cadenceStep: 0, cadencePhrase: 0, cadenceSeq: '', cadenceT: 0, dissonance: 0,
-    cadenceIndex: 0, phraseSurge: null
+    cadenceIndex: 0, phraseSurge: null, paceLock: 0, paceDebt: 0, paceRepeat: '', paceRepeatN: 0, paceRepeatT: 0
   };
   Object.assign(f, o);
   for (let i = 0; i < 7; i++) f.scarf.push({ x: x + 3, y: y + 5, ox: x + 3, oy: y + 5 });
@@ -95,6 +95,10 @@ function killFighter(f, by) {
 // I = { md, jumpP, jumpH, down, l, r, lp, rp, dodgeP, wx, wy, faceAim }
 function tickFighter(f, I) {
   f.px = f.x; f.py = f.y; if (f.flash > 0) f.flash--;
+  if (f.paceLock > 0) f.paceLock--;
+  if (f.paceDebt > 0) f.paceDebt = max(0, f.paceDebt - .35);
+  if (f.paceRepeatT > 0) f.paceRepeatT--;
+  else if (f.paceRepeatN > 0) { f.paceRepeatN = 0; f.paceRepeat = ''; }
   if (f.phraseSurge) { f.phraseSurge.t--; if (f.phraseSurge.t <= 0) f.phraseSurge = null; }
   if (f.snapped > 0) f.snapped--;
   if (f.tempoT > 0) f.tempoT--;
@@ -127,6 +131,13 @@ function tickFighter(f, I) {
   if (isW && free) {
     if (I.lp || I.rp) {
       const b = I.lp ? 'L' : 'H';
+      if (f.paceLock > 0) {
+        f.fray = min(100, (f.fray || 0) + 3);
+        f.dissonance = min(100, (f.dissonance || 0) + 5);
+        f.paceDebt = min(100, (f.paceDebt || 0) + 7);
+        f.attackInputCd = 4;
+        if (f === G.p && G.time % 12 === 0) numPop(f.x + 3, f.y - 12, 'COMMIT', '#ff8a3d', .7);
+      } else
       if (f.attackInputCd <= 0) {
         if (f.state === 'normal') f.buf = { b, t: 10 };
         else if (f.state === 'attack' && f.atk && f.atk.phase === 2) {
